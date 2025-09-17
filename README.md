@@ -1,1 +1,1 @@
-# AI_completion
+# pest-detector
