@@ -1,1 +1,1 @@
-# pest-detector
+# guoyan-zhizao
