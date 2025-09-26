@@ -1,0 +1,316 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-config
+  namespace: fruit-sort
+  labels:
+    app: postgres
+type: Opaque
+data:
+  # PostgreSQL configuration
+  POSTGRES_INITDB_ARGS: LS0tYXV0aC1ob3N0PW1kNSAtLWF1dGgtbG9jYWw9bWQ1 # --auth-host=md5 --auth-local=md5
+  POSTGRES_HOST_AUTH_METHOD: bWQ1 # md5
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: fruit-sort
+  labels:
+    app: postgres
+data:
+  01-init-db.sql: |
+    -- 创建扩展
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+    -- 创建果蔬分类表
+    CREATE TABLE IF NOT EXISTS fruit_categories (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      name VARCHAR(100) NOT NULL UNIQUE,
+      description TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 创建检测结果表
+    CREATE TABLE IF NOT EXISTS detection_results (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      image_id VARCHAR(255) NOT NULL,
+      category_id UUID REFERENCES fruit_categories(id),
+      confidence DECIMAL(5,4) NOT NULL,
+      bbox_x INTEGER NOT NULL,
+      bbox_y INTEGER NOT NULL,
+      bbox_width INTEGER NOT NULL,
+      bbox_height INTEGER NOT NULL,
+      processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 创建分拣任务表
+    CREATE TABLE IF NOT EXISTS sorting_tasks (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      batch_id VARCHAR(255) NOT NULL,
+      total_items INTEGER DEFAULT 0,
+      processed_items INTEGER DEFAULT 0,
+      status VARCHAR(50) DEFAULT 'pending',
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 创建索引
+    CREATE INDEX IF NOT EXISTS idx_detection_results_image_id ON detection_results(image_id);
+    CREATE INDEX IF NOT EXISTS idx_detection_results_category_id ON detection_results(category_id);
+    CREATE INDEX IF NOT EXISTS idx_sorting_tasks_batch_id ON sorting_tasks(batch_id);
+    CREATE INDEX IF NOT EXISTS idx_sorting_tasks_status ON sorting_tasks(status);
+
+    -- 插入默认果蔬分类
+    INSERT INTO fruit_categories (name, description) VALUES
+    ('apple', '苹果'),
+    ('banana', '香蕉'),
+    ('orange', '橙子'),
+    ('grape', '葡萄'),
+    ('strawberry', '草莓'),
+    ('tomato', '番茄'),
+    ('carrot', '胡萝卜'),
+    ('potato', '土豆')
+    ON CONFLICT (name) DO NOTHING;
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: fruit-sort
+  labels:
+    app: postgres
+    tier: database
+spec:
+  serviceName: postgres-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+        tier: database
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+      - name: postgres
+        image: postgres:15.4-alpine
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: fruit-sort-config
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: fruit-sort-config
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fruit-sort-secrets
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_HOST_AUTH_METHOD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-config
+              key: POSTGRES_HOST_AUTH_METHOD
+        - name: POSTGRES_INITDB_ARGS
+          valueFrom:
+            secretKeyRef:
+              name: postgres-config
+              key: POSTGRES_INITDB_ARGS
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - exec pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p 5432
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - exec pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p 5432
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+          readOnly: true
+        - name: postgres-config-volume
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+          readOnly: true
+      volumes:
+      - name: init-scripts
+        configMap:
+          name: postgres-init
+      - name: postgres-config-volume
+        configMap:
+          name: postgres-performance-config
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: fast-ssd
+      resources:
+        requests:
+          storage: 50Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-performance-config
+  namespace: fruit-sort
+  labels:
+    app: postgres
+data:
+  postgresql.conf: |
+    # PostgreSQL Performance Configuration
+    # Memory settings
+    shared_buffers = 512MB
+    effective_cache_size = 1536MB
+    work_mem = 8MB
+    maintenance_work_mem = 128MB
+
+    # Checkpoint settings
+    wal_buffers = 16MB
+    checkpoint_completion_target = 0.9
+    max_wal_size = 2GB
+    min_wal_size = 1GB
+
+    # Connection settings
+    max_connections = 200
+
+    # Logging
+    logging_collector = on
+    log_directory = 'pg_log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_min_duration_statement = 1000
+    log_statement = 'all'
+    log_connections = on
+    log_disconnections = on
+    log_lock_waits = on
+
+    # Autovacuum settings
+    autovacuum = on
+    autovacuum_max_workers = 4
+    autovacuum_naptime = 30s
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: fruit-sort
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  type: ClusterIP
+  sessionAffinity: None
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: fruit-sort
+  labels:
+    app: postgres
+spec:
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-network-policy
+  namespace: fruit-sort
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          tier: backend
+    - podSelector:
+        matchLabels:
+          app: query-service
+    - podSelector:
+        matchLabels:
+          app: sort-service
+    ports:
+    - protocol: TCP
+      port: 5432
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres-pdb
+  namespace: fruit-sort
+spec:
+  minAvailable: 0
+  selector:
+    matchLabels:
+      app: postgres

@@ -1,0 +1,462 @@
+# Storage Classes
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+  labels:
+    app: storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: kubernetes.io/gce-pd  # 根据云平台调整
+parameters:
+  type: pd-ssd
+  zones: us-central1-a,us-central1-b,us-central1-c
+  replication-type: none
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard
+  labels:
+    app: storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: kubernetes.io/gce-pd  # 根据云平台调整
+parameters:
+  type: pd-standard
+  zones: us-central1-a,us-central1-b,us-central1-c
+  replication-type: none
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: slow-hdd
+  labels:
+    app: storage
+provisioner: kubernetes.io/gce-pd  # 根据云平台调整
+parameters:
+  type: pd-standard
+  zones: us-central1-a,us-central1-b,us-central1-c
+  replication-type: none
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+
+---
+# Persistent Volumes for critical data
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: database-backup-pv
+  labels:
+    app: database-backup
+spec:
+  capacity:
+    storage: 200Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: standard
+  gcePersistentDisk:  # 根据云平台调整
+    pdName: database-backup-disk
+    fsType: ext4
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: database-backup-pvc
+  namespace: fruit-sort
+  labels:
+    app: database-backup
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi
+  storageClassName: standard
+  volumeName: database-backup-pv
+
+---
+# Shared storage for ML models
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: shared-models-pv
+  labels:
+    app: shared-models
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadOnlyMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: fast-ssd
+  nfs:  # 使用NFS进行共享存储
+    server: nfs-server.fruit-sort.local  # 需要部署NFS服务器
+    path: /shared/models
+    readOnly: false
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-models-pvc
+  namespace: fruit-sort
+  labels:
+    app: shared-models
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: fast-ssd
+  volumeName: shared-models-pv
+
+---
+# Backup and restore jobs configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-scripts
+  namespace: fruit-sort
+  labels:
+    app: backup
+data:
+  database-backup.sh: |
+    #!/bin/bash
+    set -e
+
+    BACKUP_DIR="/backup/$(date +%Y-%m-%d)"
+    mkdir -p "$BACKUP_DIR"
+
+    echo "Starting PostgreSQL backup at $(date)"
+
+    # Database backup
+    PGPASSWORD="$POSTGRES_PASSWORD" pg_dump \
+      -h "$DATABASE_HOST" \
+      -p "$DATABASE_PORT" \
+      -U "$POSTGRES_USER" \
+      -d "$POSTGRES_DB" \
+      --verbose \
+      --format=custom \
+      --compress=9 \
+      --file="$BACKUP_DIR/database-$(date +%H%M%S).dump"
+
+    # Cleanup old backups (keep last 30 days)
+    find /backup -type d -mtime +30 -exec rm -rf {} \; 2>/dev/null || true
+
+    echo "Database backup completed at $(date)"
+
+    # Upload to cloud storage (optional)
+    if [ ! -z "$CLOUD_STORAGE_BUCKET" ]; then
+      echo "Uploading backup to cloud storage..."
+      gsutil cp -r "$BACKUP_DIR" "gs://$CLOUD_STORAGE_BUCKET/database-backups/"
+    fi
+
+  minio-backup.sh: |
+    #!/bin/bash
+    set -e
+
+    BACKUP_DIR="/backup/minio/$(date +%Y-%m-%d)"
+    mkdir -p "$BACKUP_DIR"
+
+    echo "Starting MinIO backup at $(date)"
+
+    # Configure mc client
+    mc alias set minio "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"
+
+    # Backup all buckets
+    for bucket in $(mc ls minio | awk '{print $5}'); do
+      echo "Backing up bucket: $bucket"
+      mc mirror "minio/$bucket" "$BACKUP_DIR/$bucket"
+    done
+
+    # Cleanup old backups
+    find /backup/minio -type d -mtime +30 -exec rm -rf {} \; 2>/dev/null || true
+
+    echo "MinIO backup completed at $(date)"
+
+  restore-database.sh: |
+    #!/bin/bash
+    set -e
+
+    if [ -z "$1" ]; then
+      echo "Usage: $0 <backup-file>"
+      exit 1
+    fi
+
+    BACKUP_FILE="$1"
+
+    echo "Starting database restore from $BACKUP_FILE at $(date)"
+
+    # Stop applications temporarily
+    kubectl scale deployment --all --replicas=0 -n fruit-sort
+
+    # Wait for pods to terminate
+    sleep 30
+
+    # Restore database
+    PGPASSWORD="$POSTGRES_PASSWORD" pg_restore \
+      -h "$DATABASE_HOST" \
+      -p "$DATABASE_PORT" \
+      -U "$POSTGRES_USER" \
+      -d "$POSTGRES_DB" \
+      --verbose \
+      --clean \
+      --if-exists \
+      "$BACKUP_FILE"
+
+    # Restart applications
+    kubectl scale deployment --all --replicas=2 -n fruit-sort
+
+    echo "Database restore completed at $(date)"
+
+---
+# Scheduled backup jobs
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-backup-job
+  namespace: fruit-sort
+  labels:
+    app: database-backup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: postgres:15.4-alpine
+            env:
+            - name: DATABASE_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: fruit-sort-config
+                  key: DATABASE_HOST
+            - name: DATABASE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: fruit-sort-config
+                  key: DATABASE_PORT
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: fruit-sort-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: fruit-sort-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fruit-sort-secrets
+                  key: POSTGRES_PASSWORD
+            - name: CLOUD_STORAGE_BUCKET
+              value: "fruit-sort-backups"
+            command: ["/bin/bash"]
+            args: ["/scripts/database-backup.sh"]
+            volumeMounts:
+            - name: backup-scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: backup-scripts
+            configMap:
+              name: backup-scripts
+              defaultMode: 0755
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: database-backup-pvc
+          restartPolicy: OnFailure
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: minio-backup-job
+  namespace: fruit-sort
+  labels:
+    app: minio-backup
+spec:
+  schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: minio/mc:RELEASE.2023-09-07T22-48-55Z
+            env:
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: fruit-sort-config
+                  key: MINIO_ENDPOINT
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: fruit-sort-secrets
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: fruit-sort-secrets
+                  key: MINIO_SECRET_KEY
+            command: ["/bin/bash"]
+            args: ["/scripts/minio-backup.sh"]
+            volumeMounts:
+            - name: backup-scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: backup-scripts
+            configMap:
+              name: backup-scripts
+              defaultMode: 0755
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: database-backup-pvc
+          restartPolicy: OnFailure
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 1
+
+---
+# Volume snapshots for disaster recovery
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: fast-ssd-snapshot
+  labels:
+    app: volume-snapshots
+driver: pd.csi.storage.gke.io  # 根据云平台调整
+deletionPolicy: Retain
+
+---
+# Resource quotas for storage
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: storage-quota
+  namespace: fruit-sort
+spec:
+  hard:
+    persistentvolumeclaims: "20"
+    requests.storage: "1Ti"
+    fast-ssd.storageclass.storage.k8s.io/requests.storage: "500Gi"
+    standard.storageclass.storage.k8s.io/requests.storage: "500Gi"
+
+---
+# Limit ranges for PVC sizes
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: storage-limits
+  namespace: fruit-sort
+spec:
+  limits:
+  - type: PersistentVolumeClaim
+    max:
+      storage: "500Gi"
+    min:
+      storage: "1Gi"
+    default:
+      storage: "10Gi"
+    defaultRequest:
+      storage: "5Gi"
+
+---
+# Monitoring for storage usage
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: storage-metrics
+  namespace: fruit-sort
+  labels:
+    app: storage-monitoring
+spec:
+  selector:
+    matchLabels:
+      app: node-exporter
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+
+---
+# Storage cleanup job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: storage-cleanup-job
+  namespace: fruit-sort
+  labels:
+    app: storage-cleanup
+spec:
+  schedule: "0 1 * * 0"  # Weekly on Sunday at 1 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: cleanup
+            image: alpine:3.18
+            command:
+            - /bin/sh
+            - -c
+            - |
+              apk add --no-cache curl jq
+
+              echo "Starting storage cleanup at $(date)"
+
+              # Cleanup temporary uploads older than 7 days
+              find /tmp-uploads -type f -mtime +7 -delete 2>/dev/null || true
+
+              # Cleanup log files older than 30 days
+              find /app-logs -name "*.log" -mtime +30 -delete 2>/dev/null || true
+
+              # Cleanup cache files older than 3 days
+              find /cache -type f -mtime +3 -delete 2>/dev/null || true
+
+              echo "Storage cleanup completed at $(date)"
+            volumeMounts:
+            - name: temp-uploads
+              mountPath: /tmp-uploads
+            - name: app-logs
+              mountPath: /app-logs
+            - name: cache-storage
+              mountPath: /cache
+          volumes:
+          - name: temp-uploads
+            emptyDir:
+              sizeLimit: 50Gi
+          - name: app-logs
+            emptyDir:
+              sizeLimit: 10Gi
+          - name: cache-storage
+            emptyDir:
+              sizeLimit: 20Gi
+          restartPolicy: OnFailure
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1

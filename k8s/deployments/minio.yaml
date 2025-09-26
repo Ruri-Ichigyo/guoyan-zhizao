@@ -1,0 +1,363 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minio-config
+  namespace: fruit-sort
+  labels:
+    app: minio
+data:
+  # MinIO Configuration
+  MINIO_BROWSER_REDIRECT_URL: "http://minio-console.fruit-sort.local"
+  MINIO_SERVER_URL: "http://minio-service:9000"
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: fruit-sort
+  labels:
+    app: minio
+    tier: storage
+spec:
+  serviceName: minio-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+        tier: storage
+    spec:
+      securityContext:
+        fsGroup: 1001
+      containers:
+      - name: minio
+        image: minio/minio:RELEASE.2023-09-07T02-05-02Z
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9000
+          name: api
+        - containerPort: 9001
+          name: console
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: fruit-sort-secrets
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fruit-sort-secrets
+              key: MINIO_SECRET_KEY
+        - name: MINIO_BROWSER_REDIRECT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: minio-config
+              key: MINIO_BROWSER_REDIRECT_URL
+        - name: MINIO_SERVER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: minio-config
+              key: MINIO_SERVER_URL
+        - name: MINIO_PROMETHEUS_AUTH_TYPE
+          value: "public"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          minio server /data --console-address ":9001"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: minio-storage
+          mountPath: /data
+      initContainers:
+      - name: create-buckets
+        image: minio/mc:RELEASE.2023-09-07T22-48-55Z
+        env:
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: fruit-sort-secrets
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: fruit-sort-secrets
+              key: MINIO_SECRET_KEY
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for MinIO to be ready..."
+          until mc alias set myminio http://minio-service:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY; do
+            echo "MinIO is not ready yet. Sleeping for 5 seconds..."
+            sleep 5
+          done
+
+          echo "Creating buckets..."
+          mc mb myminio/fruit-images --ignore-existing
+          mc mb myminio/model-storage --ignore-existing
+          mc mb myminio/temp-uploads --ignore-existing
+          mc mb myminio/processed-images --ignore-existing
+
+          echo "Setting bucket policies..."
+          # Allow read access to fruit-images bucket for AI service
+          mc anonymous set download myminio/fruit-images
+          mc anonymous set download myminio/processed-images
+
+          echo "Buckets created and configured successfully!"
+          mc ls myminio/
+  volumeClaimTemplates:
+  - metadata:
+      name: minio-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 100Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+  namespace: fruit-sort
+  labels:
+    app: minio
+spec:
+  selector:
+    app: minio
+  ports:
+  - port: 9000
+    targetPort: 9000
+    name: api
+  - port: 9001
+    targetPort: 9001
+    name: console
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-headless
+  namespace: fruit-sort
+  labels:
+    app: minio
+spec:
+  clusterIP: None
+  selector:
+    app: minio
+  ports:
+  - port: 9000
+    targetPort: 9000
+    name: api
+  - port: 9001
+    targetPort: 9001
+    name: console
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-bucket-setup
+  namespace: fruit-sort
+spec:
+  template:
+    metadata:
+      labels:
+        app: minio-bucket-setup
+    spec:
+      containers:
+      - name: mc
+        image: minio/mc:RELEASE.2023-09-07T22-48-55Z
+        env:
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: fruit-sort-secrets
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: fruit-sort-secrets
+              key: MINIO_SECRET_KEY
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for MinIO to be ready..."
+          until mc alias set myminio http://minio-service:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY; do
+            echo "MinIO is not ready yet. Sleeping for 10 seconds..."
+            sleep 10
+          done
+
+          echo "Setting up bucket lifecycle policies..."
+
+          # Create lifecycle policy for temporary uploads (delete after 7 days)
+          cat > /tmp/lifecycle-temp.json <<EOF
+          {
+              "Rules": [
+                  {
+                      "ID": "DeleteTempUploads",
+                      "Status": "Enabled",
+                      "Expiration": {
+                          "Days": 7
+                      }
+                  }
+              ]
+          }
+          EOF
+
+          # Create lifecycle policy for processed images (delete after 30 days)
+          cat > /tmp/lifecycle-processed.json <<EOF
+          {
+              "Rules": [
+                  {
+                      "ID": "DeleteOldProcessed",
+                      "Status": "Enabled",
+                      "Expiration": {
+                          "Days": 30
+                      }
+                  }
+              ]
+          }
+          EOF
+
+          # Apply lifecycle policies
+          mc ilm import myminio/temp-uploads < /tmp/lifecycle-temp.json
+          mc ilm import myminio/processed-images < /tmp/lifecycle-processed.json
+
+          echo "Bucket lifecycle policies configured successfully!"
+          mc ilm ls myminio/temp-uploads
+          mc ilm ls myminio/processed-images
+      restartPolicy: OnFailure
+  backoffLimit: 3
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-network-policy
+  namespace: fruit-sort
+spec:
+  podSelector:
+    matchLabels:
+      app: minio
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          tier: backend
+    - podSelector:
+        matchLabels:
+          app: ai-inference
+    - podSelector:
+        matchLabels:
+          app: upload-service
+    - podSelector:
+        matchLabels:
+          app: query-service
+    - podSelector:
+        matchLabels:
+          app: sort-service
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9000
+    - protocol: TCP
+      port: 9001
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: minio-pdb
+  namespace: fruit-sort
+spec:
+  minAvailable: 0
+  selector:
+    matchLabels:
+      app: minio
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: minio-hpa
+  namespace: fruit-sort
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: minio
+  minReplicas: 1
+  maxReplicas: 1
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+
+---
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: minio-metrics
+  namespace: fruit-sort
+  labels:
+    app: minio
+spec:
+  selector:
+    matchLabels:
+      app: minio
+  endpoints:
+  - port: api
+    path: /minio/v2/metrics/cluster
+    interval: 30s
+    scrapeTimeout: 10s

@@ -1,0 +1,56 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: upload-service
+    url: http://upload-svc:3001
+    routes:
+      - name: upload-route
+        paths: ["/api/upload"]
+        methods: ["POST", "GET"]
+        plugins:
+          - name: jwt
+          - name: rate-limiting
+            config:
+              minute: 100
+              hour: 1000
+
+  - name: query-service
+    url: http://query-svc:3002
+    routes:
+      - name: query-route
+        paths: ["/api/result", "/ws"]
+        methods: ["GET", "POST"]
+        plugins:
+          - name: jwt
+          - name: rate-limiting
+            config:
+              minute: 200
+              hour: 2000
+
+  - name: sort-service
+    url: http://sort-svc:3003
+    routes:
+      - name: sort-route
+        paths: ["/api/sort"]
+        methods: ["POST", "PUT"]
+        plugins:
+          - name: jwt
+          - name: rate-limiting
+            config:
+              minute: 50
+              hour: 500
+
+plugins:
+  - name: jwt
+    config:
+      secret_is_base64: false
+      claims_to_verify: ["exp"]
+      key_claim_name: iss
+      algorithm: HS256
+
+consumers:
+  - username: fruit-client
+    jwt_secrets:
+      - key: fruit-app
+        secret: your-256-bit-secret-key-here-change-in-production

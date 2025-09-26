@@ -1,0 +1,21 @@
+{
+  "job_id": "sort_current_001",
+  "status": "running",
+  "conveyor_speed": 75,
+  "sorted_count": 324,
+  "error_count": 2,
+  "uptime": 3600,
+  "last_updated": "2023-12-01T10:30:00Z",
+  "performance_metrics": {
+    "throughput": 90,
+    "accuracy_rate": 0.98,
+    "rejection_rate": 0.02
+  },
+  "device_status": {
+    "camera_1": "online",
+    "camera_2": "online",
+    "conveyor": "running",
+    "sorter_arm": "active",
+    "sensors": "normal"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "data": [
+    {
+      "job_id": "upload_20231201_001",
+      "status": "completed",
+      "filename": "apple_batch_001.jpg",
+      "total_fruits": 15,
+      "grade_a": 8,
+      "grade_b": 5,
+      "grade_c": 2,
+      "accuracy": 0.95,
+      "processing_time": 2.1,
+      "created_at": "2023-12-01T10:30:00Z",
+      "results": [
+        {
+          "class_name": "苹果",
+          "confidence": 0.95,
+          "bbox": [10, 20, 100, 150],
+          "quality_grade": "A"
+        }
+      ]
+    },
+    {
+      "job_id": "upload_20231201_002",
+      "status": "completed",
+      "filename": "orange_batch_002.jpg",
+      "total_fruits": 12,
+      "grade_a": 6,
+      "grade_b": 4,
+      "grade_c": 2,
+      "accuracy": 0.92,
+      "processing_time": 1.8,
+      "created_at": "2023-12-01T10:25:00Z",
+      "results": [
+        {
+          "class_name": "橙子",
+          "confidence": 0.89,
+          "bbox": [200, 50, 300, 200],
+          "quality_grade": "B"
+        }
+      ]
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 150,
+    "pages": 15
+  }
+}

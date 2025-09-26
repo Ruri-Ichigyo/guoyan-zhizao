@@ -1,0 +1,357 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fruit-sort-ingress
+  namespace: fruit-sort
+  labels:
+    app: fruit-sort-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Accept,Accept-Version,Content-Length,Content-MD5,Content-Type,Date,X-Auth-Token,Authorization"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  tls:
+  - hosts:
+    - fruit-sort.example.com
+    - api.fruit-sort.example.com
+    - minio.fruit-sort.example.com
+    - grafana.fruit-sort.example.com
+    secretName: fruit-sort-tls
+  rules:
+  # Main application frontend
+  - host: fruit-sort.example.com
+    http:
+      paths:
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+
+  # API Gateway (Kong)
+  - host: api.fruit-sort.example.com
+    http:
+      paths:
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: kong-service
+            port:
+              number: 8000
+
+  # MinIO Console
+  - host: minio.fruit-sort.example.com
+    http:
+      paths:
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: minio-service
+            port:
+              number: 9001
+
+  # Grafana Monitoring
+  - host: grafana.fruit-sort.example.com
+    http:
+      paths:
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana-service
+            port:
+              number: 3000
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fruit-sort-admin-ingress
+  namespace: fruit-sort
+  labels:
+    app: fruit-sort-admin-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: admin-auth
+    nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required - Fruit Sort Admin'
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+spec:
+  tls:
+  - hosts:
+    - admin.fruit-sort.example.com
+    - kong-admin.fruit-sort.example.com
+    secretName: fruit-sort-admin-tls
+  rules:
+  # Kong Admin Interface
+  - host: kong-admin.fruit-sort.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kong-service
+            port:
+              number: 8002
+
+  # Prometheus Admin
+  - host: admin.fruit-sort.example.com
+    http:
+      paths:
+      - path: /prometheus(/.*)?
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus-service
+            port:
+              number: 9090
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-auth
+  namespace: fruit-sort
+type: Opaque
+data:
+  # admin:admin123 (generated with htpasswd)
+  auth: YWRtaW46JGFwcjEkSDY1dnJYWE8kLlF4d0ZkUjQ0N3pyWHJoT3YySmsvMA==
+
+---
+# Internal services ingress (for debugging and maintenance)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fruit-sort-internal-ingress
+  namespace: fruit-sort
+  labels:
+    app: fruit-sort-internal-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  rules:
+  # Direct access to services for debugging
+  - host: internal.fruit-sort.local
+    http:
+      paths:
+      - path: /upload(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: upload-service
+            port:
+              number: 3001
+      - path: /query(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: query-service
+            port:
+              number: 3002
+      - path: /sort(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: sort-service
+            port:
+              number: 3003
+      - path: /ai(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: ai-inference-service
+            port:
+              number: 3004
+      - path: /minio(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: minio-service
+            port:
+              number: 9000
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-network-policy
+  namespace: fruit-sort
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: fruit-sort
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 3001
+    - protocol: TCP
+      port: 3002
+    - protocol: TCP
+      port: 3003
+    - protocol: TCP
+      port: 3004
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8002
+    - protocol: TCP
+      port: 9000
+    - protocol: TCP
+      port: 9001
+    - protocol: TCP
+      port: 9090
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+
+---
+# Rate limiting for API endpoints
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-rate-limit-policy
+  namespace: fruit-sort
+spec:
+  podSelector:
+    matchLabels:
+      tier: backend
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: kong
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+
+---
+# Cluster issuer for TLS certificates
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@fruit-sort.example.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: admin@fruit-sort.example.com
+    privateKeySecretRef:
+      name: letsencrypt-staging
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+
+---
+# Custom error pages
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-error-pages
+  namespace: fruit-sort
+data:
+  404.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>页面未找到 - 果蔬智能分拣系统</title>
+        <meta charset="utf-8">
+        <style>
+            body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
+            .error-code { font-size: 72px; color: #e74c3c; }
+            .error-message { font-size: 24px; color: #333; margin: 20px 0; }
+            .back-link { color: #3498db; text-decoration: none; }
+        </style>
+    </head>
+    <body>
+        <div class="error-code">404</div>
+        <div class="error-message">抱歉，您访问的页面不存在</div>
+        <a href="/" class="back-link">返回首页</a>
+    </body>
+    </html>
+
+  502.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>服务暂时不可用 - 果蔬智能分拣系统</title>
+        <meta charset="utf-8">
+        <style>
+            body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
+            .error-code { font-size: 72px; color: #f39c12; }
+            .error-message { font-size: 24px; color: #333; margin: 20px 0; }
+            .back-link { color: #3498db; text-decoration: none; }
+        </style>
+    </head>
+    <body>
+        <div class="error-code">502</div>
+        <div class="error-message">服务暂时不可用，请稍后重试</div>
+        <a href="/" class="back-link">返回首页</a>
+    </body>
+    </html>

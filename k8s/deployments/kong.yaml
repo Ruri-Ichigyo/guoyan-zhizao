@@ -1,0 +1,437 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  namespace: fruit-sort
+  labels:
+    app: kong
+data:
+  kong.conf: |
+    # Kong configuration file
+    # Database
+    database = postgres
+    pg_host = postgres-service
+    pg_port = 5432
+    pg_user = postgres
+    pg_database = fruit_sort
+    pg_schema = kong
+
+    # Logging
+    log_level = info
+    proxy_access_log = /dev/stdout
+    admin_access_log = /dev/stdout
+    proxy_error_log = /dev/stderr
+    admin_error_log = /dev/stderr
+
+    # Network
+    proxy_listen = 0.0.0.0:8000
+    admin_listen = 0.0.0.0:8001
+    admin_gui_listen = 0.0.0.0:8002
+
+    # Security
+    real_ip_header = X-Forwarded-For
+    real_ip_recursive = on
+    trusted_ips = 0.0.0.0/0
+
+    # Performance
+    worker_processes = auto
+    nginx_worker_processes = auto
+    upstream_keepalive_max_requests = 1000
+    upstream_keepalive_pool_size = 60
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kong-migration
+  namespace: fruit-sort
+  labels:
+    app: kong-migration
+spec:
+  template:
+    metadata:
+      labels:
+        app: kong-migration
+    spec:
+      containers:
+      - name: kong-migration
+        image: kong:3.4.0-alpine
+        env:
+        - name: KONG_DATABASE
+          value: "postgres"
+        - name: KONG_PG_HOST
+          value: "postgres-service"
+        - name: KONG_PG_PORT
+          value: "5432"
+        - name: KONG_PG_USER
+          valueFrom:
+            configMapKeyRef:
+              name: fruit-sort-config
+              key: POSTGRES_USER
+        - name: KONG_PG_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fruit-sort-secrets
+              key: POSTGRES_PASSWORD
+        - name: KONG_PG_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: fruit-sort-config
+              key: POSTGRES_DB
+        - name: KONG_PG_SCHEMA
+          value: "kong"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for PostgreSQL to be ready..."
+          until pg_isready -h postgres-service -p 5432 -U postgres; do
+            echo "PostgreSQL is not ready yet. Sleeping for 5 seconds..."
+            sleep 5
+          done
+
+          echo "Running Kong migrations..."
+          kong migrations bootstrap
+          kong migrations up
+          kong migrations finish
+      restartPolicy: OnFailure
+  backoffLimit: 5
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong
+  namespace: fruit-sort
+  labels:
+    app: kong
+    tier: gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kong
+  template:
+    metadata:
+      labels:
+        app: kong
+        tier: gateway
+    spec:
+      containers:
+      - name: kong
+        image: kong:3.4.0-alpine
+        ports:
+        - containerPort: 8000
+          name: proxy
+        - containerPort: 8001
+          name: admin
+        - containerPort: 8002
+          name: admin-gui
+        env:
+        - name: KONG_DATABASE
+          value: "postgres"
+        - name: KONG_PG_HOST
+          value: "postgres-service"
+        - name: KONG_PG_PORT
+          value: "5432"
+        - name: KONG_PG_USER
+          valueFrom:
+            configMapKeyRef:
+              name: fruit-sort-config
+              key: POSTGRES_USER
+        - name: KONG_PG_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fruit-sort-secrets
+              key: POSTGRES_PASSWORD
+        - name: KONG_PG_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: fruit-sort-config
+              key: POSTGRES_DB
+        - name: KONG_PG_SCHEMA
+          value: "kong"
+        - name: KONG_PROXY_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_PROXY_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_LISTEN
+          value: "0.0.0.0:8001"
+        - name: KONG_ADMIN_GUI_LISTEN
+          value: "0.0.0.0:8002"
+        - name: KONG_PROXY_LISTEN
+          value: "0.0.0.0:8000"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: kong-config-volume
+          mountPath: /etc/kong
+          readOnly: true
+      volumes:
+      - name: kong-config-volume
+        configMap:
+          name: kong-config
+      initContainers:
+      - name: wait-for-db
+        image: postgres:15.4-alpine
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: fruit-sort-config
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fruit-sort-secrets
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: fruit-sort-config
+              key: POSTGRES_DB
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for PostgreSQL to be ready..."
+          until pg_isready -h postgres-service -p 5432 -U $POSTGRES_USER; do
+            echo "PostgreSQL is not ready yet. Sleeping for 5 seconds..."
+            sleep 5
+          done
+          echo "PostgreSQL is ready!"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-service
+  namespace: fruit-sort
+  labels:
+    app: kong
+spec:
+  selector:
+    app: kong
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: proxy
+  - port: 8001
+    targetPort: 8001
+    name: admin
+  - port: 8002
+    targetPort: 8002
+    name: admin-gui
+  type: ClusterIP
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kong-config-setup
+  namespace: fruit-sort
+spec:
+  template:
+    metadata:
+      labels:
+        app: kong-config-setup
+    spec:
+      containers:
+      - name: kong-setup
+        image: curlimages/curl:8.2.1
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for Kong Admin API to be ready..."
+          until curl -s http://kong-service:8001/status; do
+            echo "Kong Admin API is not ready yet. Sleeping for 10 seconds..."
+            sleep 10
+          done
+
+          echo "Setting up Kong services and routes..."
+
+          # Create upload service
+          curl -X POST http://kong-service:8001/services \
+            -d "name=upload-service" \
+            -d "url=http://upload-service:3001"
+
+          # Create AI inference service
+          curl -X POST http://kong-service:8001/services \
+            -d "name=ai-inference-service" \
+            -d "url=http://ai-inference-service:3004"
+
+          # Create query service
+          curl -X POST http://kong-service:8001/services \
+            -d "name=query-service" \
+            -d "url=http://query-service:3002"
+
+          # Create sort service
+          curl -X POST http://kong-service:8001/services \
+            -d "name=sort-service" \
+            -d "url=http://sort-service:3003"
+
+          # Create routes
+          curl -X POST http://kong-service:8001/services/upload-service/routes \
+            -d "name=upload-route" \
+            -d "paths[]=/api/v1/upload"
+
+          curl -X POST http://kong-service:8001/services/ai-inference-service/routes \
+            -d "name=inference-route" \
+            -d "paths[]=/api/v1/inference"
+
+          curl -X POST http://kong-service:8001/services/query-service/routes \
+            -d "name=query-route" \
+            -d "paths[]=/api/v1/query"
+
+          curl -X POST http://kong-service:8001/services/sort-service/routes \
+            -d "name=sort-route" \
+            -d "paths[]=/api/v1/sort"
+
+          # Add rate limiting plugin
+          curl -X POST http://kong-service:8001/plugins \
+            -d "name=rate-limiting" \
+            -d "config.minute=100" \
+            -d "config.hour=1000"
+
+          # Add CORS plugin
+          curl -X POST http://kong-service:8001/plugins \
+            -d "name=cors" \
+            -d "config.origins=*" \
+            -d "config.methods=GET,POST,PUT,DELETE,OPTIONS" \
+            -d "config.headers=Accept,Accept-Version,Content-Length,Content-MD5,Content-Type,Date,X-Auth-Token,Authorization"
+
+          # Add request logging plugin
+          curl -X POST http://kong-service:8001/plugins \
+            -d "name=http-log" \
+            -d "config.http_endpoint=http://logstash:5044"
+
+          echo "Kong configuration completed successfully!"
+      restartPolicy: OnFailure
+  backoffLimit: 3
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kong-network-policy
+  namespace: fruit-sort
+spec:
+  podSelector:
+    matchLabels:
+      app: kong
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8001
+    - protocol: TCP
+      port: 8002
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          tier: backend
+    ports:
+    - protocol: TCP
+      port: 3001
+    - protocol: TCP
+      port: 3002
+    - protocol: TCP
+      port: 3003
+    - protocol: TCP
+      port: 3004
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kong-pdb
+  namespace: fruit-sort
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: kong
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kong-hpa
+  namespace: fruit-sort
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kong
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60

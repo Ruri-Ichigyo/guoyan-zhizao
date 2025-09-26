@@ -1,0 +1,284 @@
+import cv2
+import numpy as np
+from typing import List, Dict, Tuple
+
+def postprocess_results(detections: List[Dict], image_shape: Tuple[int, int]) -> List[Dict]:
+    """
+    Post-process detection results.
+
+    Args:
+        detections: Raw detections from model
+        image_shape: Original image shape (height, width)
+
+    Returns:
+        Processed detections with additional metadata
+    """
+    processed_detections = []
+
+    for detection in detections:
+        # Calculate relative coordinates
+        x1, y1, x2, y2 = detection['bbox']
+        height, width = image_shape[:2]
+
+        relative_bbox = [
+            x1 / width,   # x1_rel
+            y1 / height,  # y1_rel
+            x2 / width,   # x2_rel
+            y2 / height   # y2_rel
+        ]
+
+        # Calculate area and aspect ratio
+        area = (x2 - x1) * (y2 - y1)
+        aspect_ratio = (x2 - x1) / (y2 - y1) if (y2 - y1) > 0 else 1.0
+
+        processed_detection = {
+            **detection,
+            'relative_bbox': relative_bbox,
+            'area': float(area),
+            'aspect_ratio': float(aspect_ratio),
+            'center': [(x1 + x2) / 2, (y1 + y2) / 2]
+        }
+
+        processed_detections.append(processed_detection)
+
+    return processed_detections
+
+def calculate_quality_grade(fruit_region: np.ndarray, class_name: str, confidence: float) -> str:
+    """
+    Calculate fruit quality grade based on visual features.
+
+    Args:
+        fruit_region: Cropped fruit image region
+        class_name: Detected fruit class name
+        confidence: Detection confidence
+
+    Returns:
+        Quality grade: 'A', 'B', or 'C'
+    """
+    try:
+        if fruit_region.size == 0:
+            return 'C'
+
+        # Convert to different color spaces for analysis
+        hsv = cv2.cvtColor(fruit_region, cv2.COLOR_BGR2HSV)
+        lab = cv2.cvtColor(fruit_region, cv2.COLOR_BGR2LAB)
+
+        # Calculate various quality indicators
+        color_uniformity = calculate_color_uniformity(hsv)
+        surface_quality = analyze_surface_defects(fruit_region)
+        size_score = calculate_size_score(fruit_region.shape[:2])
+        freshness_score = analyze_freshness(lab)
+
+        # Combine scores with weights
+        total_score = (
+            confidence * 0.3 +
+            color_uniformity * 0.25 +
+            surface_quality * 0.25 +
+            size_score * 0.1 +
+            freshness_score * 0.1
+        )
+
+        # Determine grade based on total score
+        if total_score >= 0.8:
+            return 'A'
+        elif total_score >= 0.6:
+            return 'B'
+        else:
+            return 'C'
+
+    except Exception:
+        # Fallback to confidence-based grading
+        if confidence >= 0.9:
+            return 'A'
+        elif confidence >= 0.7:
+            return 'B'
+        else:
+            return 'C'
+
+def calculate_color_uniformity(hsv_image: np.ndarray) -> float:
+    """
+    Calculate color uniformity score.
+
+    Args:
+        hsv_image: Image in HSV color space
+
+    Returns:
+        Uniformity score (0-1)
+    """
+    try:
+        # Calculate standard deviation of hue and saturation
+        h, s, v = cv2.split(hsv_image)
+
+        # Focus on non-black pixels
+        mask = v > 30
+
+        if np.sum(mask) == 0:
+            return 0.5
+
+        h_std = np.std(h[mask])
+        s_std = np.std(s[mask])
+
+        # Normalize and combine
+        h_uniformity = max(0, 1 - h_std / 180.0)
+        s_uniformity = max(0, 1 - s_std / 255.0)
+
+        return (h_uniformity + s_uniformity) / 2
+
+    except Exception:
+        return 0.5
+
+def analyze_surface_defects(image: np.ndarray) -> float:
+    """
+    Analyze surface quality and detect defects.
+
+    Args:
+        image: Fruit image region
+
+    Returns:
+        Surface quality score (0-1)
+    """
+    try:
+        # Convert to grayscale
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Apply Gaussian blur to reduce noise
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+        # Edge detection to find surface irregularities
+        edges = cv2.Canny(blurred, 50, 150)
+
+        # Calculate edge density
+        edge_density = np.sum(edges > 0) / edges.size
+
+        # Lower edge density indicates smoother surface
+        surface_score = max(0, 1 - edge_density * 5)
+
+        return min(1.0, surface_score)
+
+    except Exception:
+        return 0.5
+
+def calculate_size_score(shape: Tuple[int, int]) -> float:
+    """
+    Calculate size score based on fruit dimensions.
+
+    Args:
+        shape: Fruit region shape (height, width)
+
+    Returns:
+        Size score (0-1)
+    """
+    try:
+        height, width = shape
+        area = height * width
+
+        # Optimal size range (adjust based on requirements)
+        min_area = 1000   # Minimum acceptable size
+        optimal_area = 5000  # Optimal size
+        max_area = 15000  # Maximum before considering too large
+
+        if area < min_area:
+            return 0.3
+        elif area <= optimal_area:
+            return 0.5 + 0.5 * (area - min_area) / (optimal_area - min_area)
+        elif area <= max_area:
+            return 1.0 - 0.3 * (area - optimal_area) / (max_area - optimal_area)
+        else:
+            return 0.4
+
+    except Exception:
+        return 0.5
+
+def analyze_freshness(lab_image: np.ndarray) -> float:
+    """
+    Analyze fruit freshness based on color characteristics.
+
+    Args:
+        lab_image: Image in LAB color space
+
+    Returns:
+        Freshness score (0-1)
+    """
+    try:
+        l, a, b = cv2.split(lab_image)
+
+        # Calculate mean brightness (L channel)
+        mean_brightness = np.mean(l)
+
+        # Calculate color vibrancy (a and b channels)
+        color_variance = np.var(a) + np.var(b)
+
+        # Higher brightness and color variance usually indicate freshness
+        brightness_score = min(1.0, mean_brightness / 200.0)
+        vibrancy_score = min(1.0, color_variance / 1000.0)
+
+        freshness_score = (brightness_score + vibrancy_score) / 2
+
+        return freshness_score
+
+    except Exception:
+        return 0.5
+
+def filter_overlapping_detections(detections: List[Dict], iou_threshold: float = 0.5) -> List[Dict]:
+    """
+    Filter overlapping detections using Non-Maximum Suppression.
+
+    Args:
+        detections: List of detection dictionaries
+        iou_threshold: IoU threshold for suppression
+
+    Returns:
+        Filtered detections
+    """
+    if not detections:
+        return []
+
+    # Sort by confidence
+    detections = sorted(detections, key=lambda x: x['confidence'], reverse=True)
+
+    filtered = []
+    used_indices = set()
+
+    for i, det1 in enumerate(detections):
+        if i in used_indices:
+            continue
+
+        filtered.append(det1)
+
+        for j, det2 in enumerate(detections[i + 1:], i + 1):
+            if j in used_indices:
+                continue
+
+            # Calculate IoU
+            iou = calculate_iou(det1['bbox'], det2['bbox'])
+
+            if iou > iou_threshold:
+                used_indices.add(j)
+
+    return filtered
+
+def calculate_iou(box1: List[float], box2: List[float]) -> float:
+    """
+    Calculate Intersection over Union (IoU) of two bounding boxes.
+
+    Args:
+        box1: First bounding box [x1, y1, x2, y2]
+        box2: Second bounding box [x1, y1, x2, y2]
+
+    Returns:
+        IoU score
+    """
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+
+    if x2 <= x1 or y2 <= y1:
+        return 0.0
+
+    intersection = (x2 - x1) * (y2 - y1)
+    area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    union = area1 + area2 - intersection
+
+    return intersection / union if union > 0 else 0.0
