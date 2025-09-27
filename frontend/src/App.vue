@@ -133,11 +133,11 @@ const toggleLiveView = () => {
         liveJobsCount.value = jobStore.activeJobs.length
       }
     })
+    wsConnected.value = true // Assume connected immediately after calling connectWebSocket
   } else {
     disconnectWebSocket()
+    wsConnected.value = false // Assume disconnected immediately after calling disconnectWebSocket
   }
-
-  wsConnected.value = isConnected()
 }
 
 const saveSettings = () => {
