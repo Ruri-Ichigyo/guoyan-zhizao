@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, readonly } from 'vue' // Import readonly
 import type { Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
@@ -162,7 +162,7 @@ export const useJobStore = defineStore('job', () => {
     }
   })
 
-  const runningJobs = computed(() =>
+  const activeJobs = computed(() =>
     jobs.value.filter(job => ['pending', 'processing'].includes(job.status))
   )
 
@@ -641,7 +641,7 @@ export const useJobStore = defineStore('job', () => {
 
     // Computed
     statistics: readonly(statistics),
-    runningJobs: readonly(runningJobs),
+    activeJobs: readonly(activeJobs), // Export activeJobs
     recentJobs: readonly(recentJobs),
     canStartJob: readonly(canStartJob),
 
@@ -660,6 +660,12 @@ export const useJobStore = defineStore('job', () => {
     addError,
     addWarning,
     clearErrors,
-    clearWarnings
+    clearWarnings,
+    updateJob: (updatedJob: DetectionJob): void => { // Define updateJob here
+      const index = jobs.value.findIndex(job => job.id === updatedJob.id)
+      if (index !== -1) {
+        jobs.value[index] = { ...jobs.value[index], ...updatedJob }
+      }
+    }
   }
 })
