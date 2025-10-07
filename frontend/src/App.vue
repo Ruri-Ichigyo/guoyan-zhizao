@@ -38,19 +38,17 @@
 
         <!-- Main Content -->
         <el-main class="p-6 main-content-background">
-          <!-- Live Status Bar -->
-          <div v-if="showLiveView" class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center">
-                <el-icon class="text-green-500 mr-2 animate-pulse"><VideoCamera /></el-icon>
-                <span class="text-green-700 font-medium">实时监控已启动</span>
-              </div>
-              <div class="text-sm text-gray-600">
-                连接状态: <span :class="wsConnected ? 'text-green-600' : 'text-red-600'">
-                  {{ wsConnected ? '已连接' : '已断开' }}
-                </span>
-                <el-spinner v-if="showLiveView && !wsConnected" size="small" class="ml-2" />
-              </div>
+          <!-- Live Status Bar (Redesigned) -->
+          <div v-if="showLiveView" class="live-status-bar mb-4 p-3 rounded-lg flex items-center justify-between">
+            <div class="flex items-center">
+              <el-icon class="live-status-icon mr-2 animate-pulse"><VideoCamera /></el-icon>
+              <span class="live-status-text font-medium">实时监控已启动</span>
+            </div>
+            <div class="text-sm text-gray-600">
+              连接状态: <span :class="wsConnected ? 'text-green-600' : 'text-red-600'">
+                {{ wsConnected ? '已连接' : '已断开' }}
+              </span>
+              <el-spinner v-if="showLiveView && !wsConnected" size="small" class="ml-2" />
             </div>
           </div>
 
@@ -183,62 +181,69 @@ watch(() => wsState.value.connected, (newVal: boolean) => {
 }
 
 .app-background {
-  background: linear-gradient(135deg, #e6ffe6 0%, #c0ffc0 100%); /* Light green gradient */
+  background-color: var(--color-background-light); /* Use new light background color */
   position: relative;
   overflow: hidden;
 }
 
-.app-background::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image: url('/images/vine_top.png'), url('/images/blueberry_left.png'), url('/images/grape_right.png'), url('/images/kiwi_bottom.png'); /* Placeholder images */
-  background-repeat: no-repeat;
-  background-position: top center, 5% 80%, 95% 20%, 80% 90%;
-  background-size: 100% auto, 150px, 200px, 180px;
-  opacity: 0.8; /* Adjust as needed */
-  z-index: -1;
-}
+/* Removed .app-background::before for a cleaner look */
 
 .sidebar-background {
-  background-color: rgba(255, 255, 255, 0.3); /* Semi-transparent white */
-  backdrop-filter: blur(5px); /* Frosted glass effect */
-  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: var(--color-white); /* Solid white for sidebar */
+  border-right: 1px solid var(--color-border); /* Use new border color */
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05); /* Subtle shadow */
 }
 
 .el-menu-item {
-  color: #66bb6a; /* Light green text */
-  font-weight: bold;
-  font-size: 16px; /* Slightly larger font */
+  color: var(--color-text-secondary); /* Use secondary text color */
+  font-weight: 500; /* Slightly less bold */
+  font-size: 15px; /* Slightly smaller font */
+  border-radius: 8px; /* Add border-radius for menu items */
+  margin: 4px 8px; /* Add some margin */
+  padding-left: 16px !important; /* Adjust padding */
 }
 
 .el-menu-item.is-active {
-  background-color: rgba(76, 175, 80, 0.3) !important; /* More vibrant green active background */
-  color: #388e3c !important; /* Darker green text for active item */
-  border-left: 4px solid #4CAF50; /* Green border on active item */
+  background-color: var(--color-primary-light) !important; /* Use primary light for active background */
+  color: var(--color-white) !important; /* White text for active item */
+  border-left: none; /* Remove left border */
+  box-shadow: 0 2px 8px rgba(46, 204, 113, 0.2); /* Subtle shadow for active item */
 }
 
 .el-menu-item:hover {
-  background-color: rgba(76, 175, 80, 0.15) !important; /* Lighter vibrant green hover */
+  background-color: var(--color-primary-light) !important; /* Use primary light for hover */
+  color: var(--color-white) !important; /* White text on hover */
 }
 
 .el-menu-item .el-icon {
-  color: #66bb6a; /* Light green icon */
+  color: var(--color-text-secondary); /* Secondary text color for icons */
+  font-size: 18px; /* Adjust icon size */
 }
 
 .el-menu-item.is-active .el-icon {
-  color: #388e3c !important; /* Darker green icon for active item */
+  color: var(--color-white) !important; /* White icon for active item */
 }
 
 .main-content-background {
-  background-color: rgba(255, 255, 255, 0.4); /* Semi-transparent white */
-  backdrop-filter: blur(5px);
-  border-radius: 10px;
-  margin: 20px; /* Add some margin around the main content */
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  background-color: var(--color-white); /* Solid white for main content */
+  border-radius: 12px; /* Slightly larger border-radius */
+  margin: 16px; /* Adjust margin */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* More subtle shadow */
+}
+
+.live-status-bar {
+  background: linear-gradient(90deg, var(--color-primary-light) 0%, var(--color-primary) 100%);
+  color: var(--color-white);
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
+}
+
+.live-status-icon {
+  color: var(--color-white);
+  font-size: 20px;
+}
+
+.live-status-text {
+  color: var(--color-white);
 }
 
 .animate-pulse {

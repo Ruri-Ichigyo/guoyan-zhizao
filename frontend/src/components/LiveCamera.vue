@@ -15,7 +15,7 @@
               {{ isStreaming ? '停止' : '开始' }}
             </el-button>
             <el-dropdown @command="switchStream">
-              <el-button size="small" type="info">
+              <el-button size="small" type="info" style=" margin-left: 16px;">
                 切换摄像头
                 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
               </el-button>
@@ -208,7 +208,7 @@ import {
   FullScreen,
   Loading,
   ArrowDown,
-  CircleFilled
+  CirclePlusFilled /* Corrected icon name */
 } from '@element-plus/icons-vue'
 
 interface CameraDevice {
@@ -599,23 +599,42 @@ onUnmounted(() => {
 
 .camera-card {
   width: 100%;
-  height: 100%;
+  /* 移除固定高度，让内容自适应 */
+  border-radius: 12px; /* Consistent border-radius */
+  border: 1px solid var(--color-border); /* Consistent border */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Consistent shadow */
+  background-color: var(--color-white); /* Consistent background */
+  padding: 20px; /* 增加卡片内边距 */
 }
 
 .camera-container {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* 增加视频区域和控制面板之间的间距 */
 }
 
 .video-wrapper {
   position: relative;
   width: 100%;
-  height: 500px;
-  background: #000;
+  /* 调整视频高度，使其更具响应性 */
+  padding-bottom: 56.25%; /* 16:9 比例 */
+  height: 0;
+  background: var(--color-black); /* Use black for video background */
   border-radius: 8px;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.video-stream {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .video-stream {
@@ -639,15 +658,15 @@ onUnmounted(() => {
 
 .loading-icon {
   animation: spin 1s linear infinite;
-  color: #409eff;
+  color: var(--color-accent); /* Use accent color for loading */
 }
 
 .error-icon {
-  color: #f56c6c;
+  color: var(--color-error); /* Use error color */
 }
 
 .placeholder-icon {
-  color: #909399;
+  color: var(--color-text-placeholder); /* Use placeholder text color */
 }
 
 @keyframes spin {
@@ -664,6 +683,12 @@ onUnmounted(() => {
   gap: 5px;
 }
 
+.stream-info .el-tag {
+  background-color: rgba(0, 0, 0, 0.6); /* Darker background for tags */
+  color: var(--color-white);
+  border-color: transparent;
+}
+
 .recording-indicator {
   position: absolute;
   top: 10px;
@@ -672,14 +697,14 @@ onUnmounted(() => {
   align-items: center;
   gap: 5px;
   background: rgba(0, 0, 0, 0.7);
-  color: white;
+  color: var(--color-white);
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 12px;
 }
 
 .recording-dot {
-  color: #f56c6c;
+  color: var(--color-error); /* Use error color for recording dot */
   animation: blink 1s infinite;
 }
 
@@ -689,17 +714,22 @@ onUnmounted(() => {
 }
 
 .control-panel {
-  background: #f5f7fa;
-  padding: 12px;
+  background: var(--color-background-medium); /* Use medium background color */
+  padding: 16px; /* 增加控制面板内边距 */
   border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px; /* 增加控制面板内部组件的间距 */
 }
 
 .stream-stats span {
   display: inline-block;
+  margin-left: 10px; /* 增加统计数据项之间的间距 */
 }
 
 .settings-grid {
   padding: 10px 0;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* 调整设置网格布局，使其更灵活 */
 }
 
 :deep(.el-collapse-item__header) {

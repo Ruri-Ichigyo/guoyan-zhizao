@@ -70,7 +70,7 @@
               @click="stopSystem"
               :loading="isStopping"
             >
-              <el-icon><PowerOff /></el-icon>
+              <el-icon><SwitchButton /></el-icon>
               停止系统
             </el-button>
           </div>
@@ -82,6 +82,7 @@
               plain
               @click="emergencyStop"
               class="emergency-btn"
+              style="margin-top:7px ;"
             >
               <el-icon><Close /></el-icon>
               紧急停止
@@ -257,6 +258,59 @@
                 :marks="{ 1: '低', 5: '中', 10: '高' }"
                 @change="updateSortingParams"
               />
+            </el-form-item>
+          </el-form>
+        </div>
+      </el-card>
+
+      <!-- Sorting Recipe Management -->
+      <el-card class="control-card" shadow="hover">
+        <template #header>
+          <div class="card-header">
+            <h3>分拣方案管理</h3>
+          </div>
+        </template>
+
+        <div class="sorting-recipes">
+          <el-form label-width="80px" size="small">
+            <el-form-item label="选择方案">
+              <el-select v-model="selectedRecipeId" placeholder="选择分拣方案" @change="loadRecipe">
+                <el-option
+                  v-for="recipe in sortingRecipes"
+                  :key="recipe.id"
+                  :label="recipe.name"
+                  :value="recipe.id"
+                />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="新方案名">
+              <el-input v-model="newRecipeName" placeholder="输入新方案名称" />
+            </el-form-item>
+
+            <el-form-item>
+              <el-button type="primary" size="small" @click="saveRecipe">
+                <el-icon><Plus /></el-icon>
+                保存当前参数为新方案
+              </el-button>
+              <el-button
+                type="info"
+                size="small"
+                @click="updateRecipe"
+                :disabled="selectedRecipeId === 'default'"
+              >
+                <el-icon><Edit /></el-icon>
+                更新当前方案
+              </el-button>
+              <el-button
+                type="danger"
+                size="small"
+                @click="deleteRecipe"
+                :disabled="selectedRecipeId === 'default'"
+              >
+                <el-icon><Delete /></el-icon>
+                删除选定方案
+              </el-button>
             </el-form-item>
           </el-form>
         </div>
@@ -463,14 +517,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import {
   Setting,
   VideoPlay,
   VideoPause,
   Warning,
-  PowerOff,
+  SwitchButton,
   Close,
   Right,
   Tools,
@@ -484,7 +538,9 @@ import {
   InfoFilled,
   Delete,
   Download,
-  View
+  View,
+  Plus,
+  Edit
 } from '@element-plus/icons-vue'
 import { useJobStore } from '@/stores/job'
 import { useWebSocket } from '@/websocket'
@@ -530,6 +586,12 @@ interface SortingParams {
   defectSensitivity: number
 }
 
+interface SortingRecipe {
+  id: string
+  name: string
+  params: SortingParams
+}
+
 // Store and WebSocket
 const jobStore = useJobStore()
 const { connect, disconnect, send, onMessage } = useWebSocket()
@@ -559,6 +621,40 @@ const sortingParams = reactive<SortingParams>({
   defectDetection: true,
   defectSensitivity: 5
 })
+
+const sortingRecipes = ref<SortingRecipe[]>([
+  {
+    id: 'default',
+    name: '默认方案',
+    params: { ...sortingParams }
+  },
+  {
+    id: 'apple_standard',
+    name: '苹果标准分拣',
+    params: {
+      confidenceThreshold: 88,
+      qualityStandard: 'standard',
+      sortMode: 'category',
+      enabledCategories: ['apple'],
+      defectDetection: true,
+      defectSensitivity: 6
+    }
+  },
+  {
+    id: 'orange_strict',
+    name: '橙子严格分拣',
+    params: {
+      confidenceThreshold: 92,
+      qualityStandard: 'strict',
+      sortMode: 'category',
+      enabledCategories: ['orange'],
+      defectDetection: true,
+      defectSensitivity: 8
+    }
+  }
+])
+const newRecipeName = ref('')
+const selectedRecipeId = ref('default')
 
 const devices = ref<Device[]>([
   {
@@ -786,6 +882,82 @@ const resetParameters = () => {
   })
   updateSortingParams()
   ElMessage.success('参数已重置为默认值')
+  selectedRecipeId.value = 'default' // Reset selected recipe to default
+}
+
+const saveRecipe = () => {
+  if (!newRecipeName.value) {
+    ElMessage.warning('请输入方案名称')
+    return
+  }
+
+  const existingRecipe = sortingRecipes.value.find(r => r.name === newRecipeName.value)
+  if (existingRecipe) {
+    ElMessage.warning('方案名称已存在，请尝试更新或使用其他名称')
+    return
+  }
+
+  const newRecipe: SortingRecipe = {
+    id: Date.now().toString(),
+    name: newRecipeName.value,
+    params: { ...sortingParams }
+  }
+  sortingRecipes.value.push(newRecipe)
+  selectedRecipeId.value = newRecipe.id
+  ElMessage.success(`分拣方案 "${newRecipe.name}" 已保存`)
+  newRecipeName.value = ''
+}
+
+const updateRecipe = () => {
+  if (selectedRecipeId.value === 'default') {
+    ElMessage.warning('默认方案不能被更新')
+    return
+  }
+  const recipeIndex = sortingRecipes.value.findIndex(r => r.id === selectedRecipeId.value)
+  if (recipeIndex > -1) {
+    sortingRecipes.value[recipeIndex].params = { ...sortingParams }
+    ElMessage.success(`分拣方案 "${sortingRecipes.value[recipeIndex].name}" 已更新`)
+  } else {
+    ElMessage.error('未找到要更新的方案')
+  }
+}
+
+const loadRecipe = () => {
+  const recipe = sortingRecipes.value.find(r => r.id === selectedRecipeId.value)
+  if (recipe) {
+    Object.assign(sortingParams, recipe.params)
+    ElMessage.success(`已加载分拣方案 "${recipe.name}"`)
+  } else {
+    ElMessage.error('未找到选定的分拣方案')
+  }
+}
+
+const deleteRecipe = async () => {
+  if (selectedRecipeId.value === 'default') {
+    ElMessage.warning('默认方案不能被删除')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除分拣方案 "${sortingRecipes.value.find(r => r.id === selectedRecipeId.value)?.name}" 吗？`,
+      '删除方案',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    const index = sortingRecipes.value.findIndex(r => r.id === selectedRecipeId.value)
+    if (index > -1) {
+      const deletedRecipeName = sortingRecipes.value[index].name
+      sortingRecipes.value.splice(index, 1)
+      selectedRecipeId.value = 'default'
+      loadRecipe() // Load default after deleting
+      ElMessage.success(`分拣方案 "${deletedRecipeName}" 已删除`)
+    }
+  } catch (error) {
+    // User cancelled
+  }
 }
 
 const testDevice = async (device: Device) => {
@@ -990,20 +1162,28 @@ const stopMonitoring = () => {
   }
 }
 
+// Watch for changes in sortingParams to update the 'default' recipe
+watch(sortingParams, (newParams) => {
+  const defaultRecipe = sortingRecipes.value.find(r => r.id === 'default')
+  if (defaultRecipe) {
+    defaultRecipe.params = { ...newParams }
+  }
+}, { deep: true })
+
 // Lifecycle
 onMounted(async () => {
   // Connect to WebSocket
   await connect('ws://localhost:8080/ws/sort-control')
 
   // Setup message handlers
-  onMessage('device_status', (data) => {
+  onMessage('device_status', (data: any) => { // Explicitly type data as any
     const device = devices.value.find(d => d.id === data.deviceId)
     if (device) {
       Object.assign(device, data)
     }
   })
 
-  onMessage('system_status', (data) => {
+  onMessage('system_status', (data: any) => { // Explicitly type data as any
     systemStatus.value = data.status
     if (data.alert) {
       alerts.value.push(data.alert)

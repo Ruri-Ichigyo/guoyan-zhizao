@@ -8,8 +8,39 @@
     box-sizing: border-box;
   }
 
+  :root {
+    /* Primary Colors */
+    --color-primary: #2ECC71; /* Emerald Green */
+    --color-primary-light: #58D68D;
+    --color-primary-dark: #27AE60;
+
+    /* Accent Colors */
+    --color-accent: #007AFF; /* iOS Blue */
+    --color-accent-light: #3399FF;
+    --color-accent-dark: #0056B3;
+
+    /* Neutral Colors */
+    --color-background-light: #F8F9FA; /* Lighter background */
+    --color-background-medium: #F0F2F5; /* Medium background */
+    --color-border: #E4E7ED; /* Border color */
+    --color-text-primary: #303133; /* Dark text */
+    --color-text-secondary: #606266; /* Medium text */
+    --color-text-placeholder: #909399; /* Light text/placeholder */
+    --color-white: #FFFFFF;
+    --color-black: #000000;
+
+    /* Status Colors */
+    --color-success: #28A745;
+    --color-warning: #FFC107;
+    --color-error: #DC3545;
+    --color-info: #17A2B8;
+
+    /* Font Family */
+    --font-family-base: 'Inter', 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+  }
+
   html {
-    font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+    font-family: var(--font-family-base);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -18,8 +49,8 @@
     margin: 0;
     padding: 0;
     line-height: 1.6;
-    color: #303133;
-    background-color: #ffffff;
+    color: var(--color-text-primary);
+    background-color: var(--color-background-light); /* Use new background color */
   }
 
   /* Custom scrollbar */

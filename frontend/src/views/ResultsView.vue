@@ -29,57 +29,59 @@
         class="search-form"
         @submit.prevent="handleSearch"
       >
-        <el-row :gutter="16">
+        <el-row :gutter="20">
           <el-col :span="6">
             <el-form-item label="检测批次">
               <el-input
                 v-model="searchForm.batchId"
                 placeholder="输入批次ID"
                 clearable
+                style="width: 100%"
               />
             </el-form-item>
           </el-col>
           <el-col :span="6">
-            <el-form-item label="分类结果">
+            <el-form-item label="分类结果" class="category-form-item">
               <el-select
                 v-model="searchForm.category"
-                placeholder="选择分类"
+                placeholder="选择分类结果"
                 clearable
+                style="width: 100%"
               >
-                <el-option label="全部" value="" />
-                <el-option label="苹果" value="apple" />
-                <el-option label="橙子" value="orange" />
-                <el-option label="香蕉" value="banana" />
-                <el-option label="梨" value="pear" />
-                <el-option label="葡萄" value="grape" />
-                <el-option label="西瓜" value="watermelon" />
-                <el-option label="其他" value="other" />
+                <el-option
+                  v-for="item in categoryOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="6">
-            <el-form-item label="质量等级">
+            <el-form-item label="质量等级" class="quality-form-item">
               <el-select
                 v-model="searchForm.quality"
-                placeholder="选择质量"
+                placeholder="选择质量等级"
                 clearable
+                style="width: 100%"
               >
-                <el-option label="全部" value="" />
-                <el-option label="优质" value="excellent" />
-                <el-option label="良好" value="good" />
-                <el-option label="一般" value="fair" />
-                <el-option label="不合格" value="poor" />
+                <el-option
+                  v-for="item in qualityOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="6">
-            <el-form-item label="置信度">
+            <el-form-item label="置信度" class="confidence-form-item">
               <el-slider
                 v-model="searchForm.confidenceRange"
                 range
                 :min="0"
                 :max="100"
-                :marks="confidenceMarks"
+                :format-tooltip="formatConfidence"
                 class="confidence-slider"
               />
             </el-form-item>
@@ -139,9 +141,9 @@
         </el-col>
         <el-col :span="6">
           <el-card class="summary-card" shadow="hover">
-            <el-statistic title="合格数量" :value="statistics.qualified" suffix="个">
+            <el-statistic title="合格数" :value="statistics.qualified" suffix="个">
               <template #suffix>
-                <span style="color: #67c23a;">个</span>
+                <span>个</span>
               </template>
             </el-statistic>
             <div class="statistic-extra">
@@ -153,7 +155,7 @@
           <el-card class="summary-card" shadow="hover">
             <el-statistic title="不合格数" :value="statistics.unqualified" suffix="个">
               <template #suffix>
-                <span style="color: #f56c6c;">个</span>
+                <span>个</span>
               </template>
             </el-statistic>
             <div class="statistic-extra">
@@ -226,8 +228,8 @@
         stripe
         style="width: 100%"
       >
-        <el-table-column type="selection" width="55" />
-        <el-table-column label="预览图" width="80">
+        <el-table-column type="selection" width="50" />
+        <el-table-column label="预览图" width="70">
           <template #default="{ row }">
             <el-image
               :src="row.imageUrl"
@@ -244,23 +246,23 @@
             </el-image>
           </template>
         </el-table-column>
-        <el-table-column prop="batchId" label="批次ID" width="120" sortable />
-        <el-table-column prop="itemId" label="物品ID" width="120" />
-        <el-table-column label="分类结果" width="120">
+        <el-table-column prop="batchId" label="批次ID" width="100" sortable />
+        <el-table-column prop="itemId" label="物品ID" width="100" />
+        <el-table-column label="分类结果" width="100">
           <template #default="{ row }">
             <el-tag :type="getCategoryTagType(row.category)" size="small">
               {{ getCategoryLabel(row.category) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="质量等级" width="100">
+        <el-table-column label="质量等级" width="90">
           <template #default="{ row }">
             <el-tag :type="getQualityTagType(row.quality)" size="small">
               {{ getQualityLabel(row.quality) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="confidence" label="置信度" width="100" sortable>
+        <el-table-column prop="confidence" label="置信度" width="90" sortable>
           <template #default="{ row }">
             <el-progress
               :percentage="row.confidence"
@@ -269,7 +271,7 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="缺陷信息" width="150">
+        <el-table-column label="缺陷信息" width="130">
           <template #default="{ row }">
             <div v-if="row.defects && row.defects.length > 0">
               <el-tag
@@ -292,29 +294,29 @@
             <span v-else class="text-gray-400">无</span>
           </template>
         </el-table-column>
-        <el-table-column prop="processingTime" label="处理时间" width="100" sortable>
+        <el-table-column prop="processingTime" label="处理时间" width="90" sortable>
           <template #default="{ row }">
             {{ row.processingTime }}ms
           </template>
         </el-table-column>
-        <el-table-column prop="detectedAt" label="检测时间" width="160" sortable>
+        <el-table-column prop="detectedAt" label="检测时间" width="140" sortable>
           <template #default="{ row }">
             {{ formatDateTime(row.detectedAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" min-width="120" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button-group size="small">
-              <el-button @click.stop="viewDetail(row)" title="查看详情">
+            <div class="operation-buttons">
+              <el-button size="small" @click.stop="viewDetail(row)" title="查看详情">
                 <el-icon><View /></el-icon>
               </el-button>
-              <el-button @click.stop="reprocess(row)" title="重新处理">
+              <el-button size="small" @click.stop="reprocess(row)" title="重新处理">
                 <el-icon><RefreshRight /></el-icon>
               </el-button>
-              <el-button @click.stop="deleteResult(row)" type="danger" title="删除">
+              <el-button size="small" @click.stop="deleteResult(row)" type="danger" title="删除">
                 <el-icon><Delete /></el-icon>
               </el-button>
-            </el-button-group>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -511,6 +513,26 @@ import {
   Delete
 } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
+const categoryOptions = ref([
+  { label: '苹果', value: 'apple' },
+  { label: '香蕉', value: 'banana' },
+  { label: '橙子', value: 'orange' },
+  { label: '葡萄', value: 'grape' },
+  { label: '草莓', value: 'strawberry' },
+  { label: '西瓜', value: 'watermelon' },
+  { label: '菠萝', value: 'pineapple' },
+  { label: '芒果', value: 'mango' },
+  { label: '猕猴桃', value: 'kiwi' },
+  { label: '梨', value: 'pear' }
+]);
+
+// 质量等级选项
+const qualityOptions = ref([
+  { label: '优质', value: 'excellent' },
+  { label: '良好', value: 'good' },
+  { label: '一般', value: 'fair' },
+  { label: '不合格', value: 'poor' }
+]);
 
 interface DetectionResult {
   id: string
@@ -548,7 +570,7 @@ interface Pagination {
   total: number
 }
 
-// Reactive data
+// 搜索表单数据
 const searchForm = reactive<SearchForm>({
   batchId: '',
   category: '',
@@ -588,11 +610,16 @@ const confidenceMarks = {
   100: '100%'
 }
 
-// Methods
+// 格式化置信度显示
+const formatConfidence = (value: number) => {
+  return `${value}%`;
+}
+
+// 搜索处理
 const handleSearch = async () => {
   loading.value = true
   try {
-    // Simulate API call with search parameters
+    // 模拟API调用延迟
     await new Promise(resolve => setTimeout(resolve, 1000))
     await loadResults()
     ElMessage.success('搜索完成')
@@ -603,6 +630,7 @@ const handleSearch = async () => {
   }
 }
 
+// 重置搜索条件
 const resetSearch = () => {
   Object.assign(searchForm, {
     batchId: '',
@@ -616,6 +644,7 @@ const resetSearch = () => {
   handleSearch()
 }
 
+// 刷新结果
 const refreshResults = async () => {
   loading.value = true
   try {
@@ -628,8 +657,9 @@ const refreshResults = async () => {
   }
 }
 
+// 加载结果数据
 const loadResults = async () => {
-  // Generate mock data based on search criteria
+  // 基于搜索条件生成模拟数据
   const mockResults: DetectionResult[] = []
   const categories = ['apple', 'orange', 'banana', 'pear', 'grape', 'watermelon', 'other']
   const qualities: DetectionResult['quality'][] = ['excellent', 'good', 'fair', 'poor']
@@ -644,7 +674,7 @@ const loadResults = async () => {
       ? defectTypes.slice(0, Math.floor(Math.random() * 3) + 1)
       : []
 
-    // Apply search filters
+    // 应用搜索筛选条件
     if (searchForm.category && category !== searchForm.category) continue
     if (searchForm.quality && quality !== searchForm.quality) continue
     if (confidence < searchForm.confidenceRange[0] || confidence > searchForm.confidenceRange[1]) continue
@@ -676,7 +706,7 @@ const loadResults = async () => {
     })
   }
 
-  // Apply pagination
+  // 应用分页
   const startIndex = (pagination.currentPage - 1) * pagination.pageSize
   const endIndex = startIndex + pagination.pageSize
 
@@ -684,10 +714,12 @@ const loadResults = async () => {
   pagination.total = mockResults.length
 }
 
+// 处理表格选择变化
 const handleSelectionChange = (selection: DetectionResult[]) => {
   selectedResults.value = selection
 }
 
+// 切换卡片选择状态
 const toggleSelection = (result: DetectionResult) => {
   const index = selectedResults.value.findIndex(r => r.id === result.id)
   if (index > -1) {
@@ -697,16 +729,21 @@ const toggleSelection = (result: DetectionResult) => {
   }
 }
 
+// 行点击事件
 const handleRowClick = (result: DetectionResult) => {
   viewDetail(result)
 }
 
+// 查看详情
 const viewDetail = (result: DetectionResult) => {
   currentResult.value = result
   detailVisible.value = true
 }
 
-const reprocess = async (result: DetectionResult) => {
+// 重新处理
+const reprocess = async (result: DetectionResult | null) => {
+  if (!result) return;
+  
   try {
     await ElMessageBox.confirm(
       `确定要重新处理 ${result.itemId} 吗？`,
@@ -718,11 +755,11 @@ const reprocess = async (result: DetectionResult) => {
       }
     )
 
-    // Simulate reprocessing
+    // 模拟重新处理
     ElMessage.info('正在重新处理...')
     await new Promise(resolve => setTimeout(resolve, 2000))
 
-    // Update result with new data
+    // 更新结果数据
     const index = results.value.findIndex(r => r.id === result.id)
     if (index > -1) {
       results.value[index] = {
@@ -736,10 +773,11 @@ const reprocess = async (result: DetectionResult) => {
     ElMessage.success('重新处理完成')
     detailVisible.value = false
   } catch (error) {
-    // User cancelled
+    // 用户取消操作
   }
 }
 
+// 删除结果
 const deleteResult = async (result: DetectionResult) => {
   try {
     await ElMessageBox.confirm(
@@ -760,10 +798,11 @@ const deleteResult = async (result: DetectionResult) => {
 
     ElMessage.success('删除成功')
   } catch (error) {
-    // User cancelled
+    // 用户取消操作
   }
 }
 
+// 批量操作处理
 const handleBatchAction = async (command: string) => {
   if (selectedResults.value.length === 0) {
     ElMessage.warning('请先选择要操作的结果')
@@ -806,7 +845,7 @@ const handleBatchAction = async (command: string) => {
           }
         )
         ElMessage.info('正在批量重新处理...')
-        // Simulate batch processing
+        // 模拟批量处理
         await new Promise(resolve => setTimeout(resolve, 3000))
         selectedResults.value = []
         ElMessage.success('批量重处理完成')
@@ -814,23 +853,27 @@ const handleBatchAction = async (command: string) => {
         break
     }
   } catch (error) {
-    // User cancelled
+    // 用户取消操作
   }
 }
 
+// 导出结果
 const exportResults = async (resultsToExport = results.value) => {
   try {
+    // 确保 resultsToExport 是一个数组
+    const dataToExport = Array.isArray(resultsToExport) ? resultsToExport : results.value;
+    
     const csvContent = [
       '批次ID,物品ID,分类结果,质量等级,置信度,处理时间,检测时间,缺陷信息',
-      ...resultsToExport.map(result => [
-        result.batchId,
-        result.itemId,
-        getCategoryLabel(result.category),
-        getQualityLabel(result.quality),
-        `${result.confidence}%`,
-        `${result.processingTime}ms`,
-        formatDateTime(result.detectedAt),
-        result.defects ? result.defects.join(';') : '无'
+      ...dataToExport.map(result => [
+        result.batchId || '',
+        result.itemId || '',
+        getCategoryLabel(result.category || ''),
+        getQualityLabel(result.quality || ''),
+        `${result.confidence || 0}%`,
+        `${result.processingTime || 0}ms`,
+        formatDateTime(result.detectedAt || new Date().toISOString()),
+        result.defects && Array.isArray(result.defects) ? result.defects.join(';') : '无'
       ].join(','))
     ].join('\n')
 
@@ -847,18 +890,20 @@ const exportResults = async (resultsToExport = results.value) => {
   }
 }
 
+// 分页大小变化
 const handleSizeChange = (newSize: number) => {
   pagination.pageSize = newSize
   pagination.currentPage = 1
   loadResults()
 }
 
+// 页码变化
 const handleCurrentChange = (newPage: number) => {
   pagination.currentPage = newPage
   loadResults()
 }
 
-// Helper functions
+// 辅助函数：获取分类标签文本
 const getCategoryLabel = (category: string): string => {
   const labels: Record<string, string> = {
     apple: '苹果',
@@ -872,6 +917,7 @@ const getCategoryLabel = (category: string): string => {
   return labels[category] || category
 }
 
+// 辅助函数：获取分类标签类型
 const getCategoryTagType = (category: string): string => {
   const types: Record<string, string> = {
     apple: 'success',
@@ -885,6 +931,7 @@ const getCategoryTagType = (category: string): string => {
   return types[category] || ''
 }
 
+// 辅助函数：获取质量等级标签文本
 const getQualityLabel = (quality: string): string => {
   const labels: Record<string, string> = {
     excellent: '优质',
@@ -895,6 +942,7 @@ const getQualityLabel = (quality: string): string => {
   return labels[quality] || quality
 }
 
+// 辅助函数：获取质量等级标签类型
 const getQualityTagType = (quality: string): string => {
   const types: Record<string, string> = {
     excellent: 'success',
@@ -905,6 +953,7 @@ const getQualityTagType = (quality: string): string => {
   return types[quality] || ''
 }
 
+// 辅助函数：获取置信度颜色
 const getConfidenceColor = (confidence: number): string => {
   if (confidence >= 90) return '#67c23a'
   if (confidence >= 80) return '#409eff'
@@ -912,11 +961,12 @@ const getConfidenceColor = (confidence: number): string => {
   return '#f56c6c'
 }
 
+// 辅助函数：格式化日期时间
 const formatDateTime = (dateString: string): string => {
   return dayjs(dateString).format('YYYY-MM-DD HH:mm:ss')
 }
 
-// Lifecycle
+// 组件挂载时加载数据
 onMounted(() => {
   loadResults()
 })
@@ -1161,7 +1211,7 @@ onMounted(() => {
   gap: 4px;
 }
 
-/* Responsive design */
+/* 响应式设计 */
 @media (max-width: 768px) {
   .results-view {
     padding: 12px;
@@ -1204,5 +1254,85 @@ onMounted(() => {
 
 :deep(.el-progress-bar) {
   flex: 1;
+}
+
+.operation-buttons {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  gap: 8px;
+}
+
+:deep(.el-table) {
+  table-layout: fixed;
+  width: 100% !important;
+  margin: 0;
+}
+
+:deep(.el-table__cell) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 8px 0;
+}
+
+:deep(.el-table .cell) {
+  padding: 0 8px;
+}
+
+.result-thumbnail {
+  width: 50px;
+  height: 50px;
+  border-radius: 4px;
+}
+
+.defect-tag {
+  margin: 2px;
+}
+
+:deep(.el-button--small) {
+  padding: 6px;
+  min-height: 28px;
+}
+
+/* 搜索表单样式优化 */
+.search-form {
+  padding: 10px 0;
+}
+
+.search-form :deep(.el-form-item) {
+  margin-bottom: 18px;
+  width: 100%;
+}
+
+.search-form :deep(.el-form-item__label) {
+  padding-right: 12px;
+  font-weight: 500;
+}
+
+.search-row {
+  margin-bottom: 10px;
+}
+
+.confidence-form-item :deep(.el-form-item__content) {
+  padding: 0 10px;
+}
+
+.date-form-item :deep(.el-date-editor) {
+  width: 100%;
+}
+
+.defect-form-item :deep(.el-switch__label) {
+  margin: 0 4px;
+}
+
+.search-buttons :deep(.el-form-item__content) {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+:deep(.el-button--small) {
+  min-height: 28px;
 }
 </style>
