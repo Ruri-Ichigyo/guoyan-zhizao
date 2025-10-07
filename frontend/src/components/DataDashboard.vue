@@ -341,11 +341,11 @@ const defectChartLoading = ref(false)
 
 // Progress colors
 const progressColors = [
-  { color: '#f56c6c', percentage: 20 },
-  { color: '#e6a23c', percentage: 40 },
-  { color: '#5cb87a', percentage: 60 },
-  { color: '#1989fa', percentage: 80 },
-  { color: '#6f7ad3', percentage: 100 }
+  { color: 'var(--color-error)', percentage: 20 },
+  { color: 'var(--color-warning)', percentage: 40 },
+  { color: 'var(--color-success)', percentage: 60 },
+  { color: 'var(--color-accent)', percentage: 80 },
+  { color: 'var(--color-primary)', percentage: 100 }
 ]
 
 // Chart options
@@ -358,12 +358,15 @@ const volumeChartOption = ref({
     axisPointer: {
       type: 'cross',
       label: {
-        backgroundColor: '#6a7985'
+        backgroundColor: 'var(--color-text-secondary)'
       }
     }
   },
   legend: {
-    data: ['处理量', '合格数', '不合格数']
+    data: ['处理量', '合格数', '不合格数'],
+    textStyle: {
+      color: 'var(--color-text-secondary)'
+    }
   },
   grid: {
     left: '3%',
@@ -374,10 +377,31 @@ const volumeChartOption = ref({
   xAxis: {
     type: 'category',
     boundaryGap: false,
-    data: [] as string[]
+    data: [] as string[],
+    axisLabel: {
+      color: 'var(--color-text-placeholder)'
+    },
+    axisLine: {
+      lineStyle: {
+        color: 'var(--color-border)'
+      }
+    }
   },
   yAxis: {
-    type: 'value'
+    type: 'value',
+    axisLabel: {
+      color: 'var(--color-text-placeholder)'
+    },
+    axisLine: {
+      lineStyle: {
+        color: 'var(--color-border)'
+      }
+    },
+    splitLine: {
+      lineStyle: {
+        color: 'var(--color-background-medium)'
+      }
+    }
   },
   series: [
     {
@@ -386,8 +410,8 @@ const volumeChartOption = ref({
       stack: 'Total',
       data: [] as number[],
       smooth: true,
-      lineStyle: { color: '#409eff' },
-      areaStyle: { opacity: 0.3 }
+      lineStyle: { color: 'var(--color-accent)' },
+      areaStyle: { color: 'rgba(0, 122, 255, 0.1)' } // Using rgba for accent color with opacity
     },
     {
       name: '合格数',
@@ -395,8 +419,8 @@ const volumeChartOption = ref({
       stack: 'Total',
       data: [] as number[],
       smooth: true,
-      lineStyle: { color: '#67c23a' },
-      areaStyle: { opacity: 0.3 }
+      lineStyle: { color: 'var(--color-success)' },
+      areaStyle: { color: 'rgba(40, 167, 69, 0.1)' } // Using rgba for success color with opacity
     },
     {
       name: '不合格数',
@@ -404,8 +428,8 @@ const volumeChartOption = ref({
       stack: 'Total',
       data: [] as number[],
       smooth: true,
-      lineStyle: { color: '#f56c6c' },
-      areaStyle: { opacity: 0.3 }
+      lineStyle: { color: 'var(--color-error)' },
+      areaStyle: { color: 'rgba(220, 53, 69, 0.1)' } // Using rgba for error color with opacity
     }
   ]
 })
@@ -425,14 +449,33 @@ const accuracyChartOption = ref({
   },
   xAxis: {
     type: 'category',
-    data: [] as string[]
+    data: [] as string[],
+    axisLabel: {
+      color: 'var(--color-text-placeholder)'
+    },
+    axisLine: {
+      lineStyle: {
+        color: 'var(--color-border)'
+      }
+    }
   },
   yAxis: {
     type: 'value',
     min: 90,
     max: 100,
     axisLabel: {
-      formatter: '{value}%'
+      formatter: '{value}%',
+      color: 'var(--color-text-placeholder)'
+    },
+    axisLine: {
+      lineStyle: {
+        color: 'var(--color-border)'
+      }
+    },
+    splitLine: {
+      lineStyle: {
+        color: 'var(--color-background-medium)'
+      }
     }
   },
   series: [
@@ -441,14 +484,20 @@ const accuracyChartOption = ref({
       type: 'line',
       data: [] as number[],
       smooth: true,
-      lineStyle: { color: '#409eff', width: 3 },
+      lineStyle: { color: 'var(--color-primary)', width: 3 },
       symbol: 'circle',
       symbolSize: 6,
+      itemStyle: {
+        color: 'var(--color-primary)'
+      },
       markLine: {
         data: [
           { type: 'average', name: '平均值' },
-          { yAxis: 95, name: '目标值', lineStyle: { color: '#67c23a' } }
-        ]
+          { yAxis: 95, name: '目标值', lineStyle: { color: 'var(--color-success)' } }
+        ],
+        label: {
+          color: 'var(--color-text-secondary)'
+        }
       }
     }
   ]
@@ -463,29 +512,46 @@ const categoryChartOption = ref({
   },
   legend: {
     orient: 'vertical',
-    left: 'left'
+    left: 'left',
+    textStyle: {
+      color: 'var(--color-text-primary)' // 将图例字体颜色改为深色系
+    }
   },
   series: [
     {
       name: '分类分布',
       type: 'pie',
-      radius: ['40%', '70%'],
+      radius: [0, '70%'],
       avoidLabelOverlap: false,
       label: {
-        show: false,
-        position: 'center'
-      },
-      emphasis: {
-        label: {
-          show: true,
-          fontSize: '30',
-          fontWeight: 'bold'
-        }
+        show: true,
+        position: 'outside',
+        formatter: '{b}: {d}%',
+        color: 'var(--color-text-primary)'
       },
       labelLine: {
-        show: false
+        show: true,
+        length: 10,
+        length2: 15,
+        lineStyle: {
+          color: 'var(--color-text-secondary)'
+        }
       },
-      data: [] as Array<{ name: string; value: number }>
+      data: [] as Array<{ name: string; value: number }>,
+      itemStyle: {
+        borderRadius: 5,
+        borderColor: 'var(--color-white)',
+        borderWidth: 2
+      },
+      color: [
+        '#FF0000', // Red (苹果)
+        '#FF8C00', // DarkOrange (替换 var(--color-accent) for 橙子)
+        '#B8860B', // DarkGoldenRod (替换 #FFD700 Gold for 香蕉)
+        '#8A2BE2', // BlueViolet
+        '#FF6347', // Tomato
+        '#20B2AA', // LightSeaGreen
+        '#6A5ACD' // SlateBlue
+      ]
     }
   ]
 })
@@ -505,10 +571,31 @@ const qualityChartOption = ref({
   },
   xAxis: {
     type: 'category',
-    data: ['优质', '良好', '一般', '不合格']
+    data: ['优质', '良好', '一般', '不合格'],
+    axisLabel: {
+      color: 'var(--color-text-placeholder)'
+    },
+    axisLine: {
+      lineStyle: {
+        color: 'var(--color-border)'
+      }
+    }
   },
   yAxis: {
-    type: 'value'
+    type: 'value',
+    axisLabel: {
+      color: 'var(--color-text-placeholder)'
+    },
+    axisLine: {
+      lineStyle: {
+        color: 'var(--color-border)'
+      }
+    },
+    splitLine: {
+      lineStyle: {
+        color: 'var(--color-background-medium)'
+      }
+    }
   },
   series: [
     {
@@ -516,8 +603,14 @@ const qualityChartOption = ref({
       type: 'bar',
       data: [12500, 8900, 3400, 1200],
       itemStyle: {
+        borderRadius: [5, 5, 0, 0], // Rounded corners for bars
         color: function(params: any) {
-          const colors = ['#67c23a', '#409eff', '#e6a23c', '#f56c6c']
+        const colors = [
+          '#36B37E', // 优质 (深绿，更沉稳)
+          '#2563EB', // 良好 (深蓝，降低饱和度)
+          '#FFAB00', // 一般 (橙黄，减少刺眼感)
+          '#E53E3E'  // 不合格 (深红，降低明度)
+        ]
           return colors[params.dataIndex]
         }
       }
@@ -532,7 +625,10 @@ const defectChartOption = ref({
   },
   legend: {
     bottom: 0,
-    data: ['表面缺陷', '形状异常', '颜色异常', '尺寸不符', '其他']
+    data: ['表面缺陷', '形状异常', '颜色异常', '尺寸不符', '其他'],
+    textStyle: {
+      color: 'var(--color-text-secondary)'
+    }
   },
   series: [
     {
@@ -552,6 +648,24 @@ const defectChartOption = ref({
           shadowOffsetX: 0,
           shadowColor: 'rgba(0, 0, 0, 0.5)'
         }
+      },
+      itemStyle: {
+        borderRadius: 5,
+        borderColor: 'var(--color-white)',
+        borderWidth: 2
+      },
+      color: [
+        '#8B0000', // 表面缺陷 (DarkRed)
+        '#483D8B', // 形状异常 (DarkSlateBlue)
+        '#DAA520', // 颜色异常 (Goldenrod)
+        '#2F4F4F', // 尺寸不符 (DarkSlateGray)
+        '#696969'  // 其他 (DimGray)
+      ],
+      label: { // 添加标签配置，确保字体颜色不是白色
+        show: true,
+        position: 'outside',
+        formatter: '{b}: {d}%',
+        color: 'var(--color-text-primary)' // 使用深色字体
       }
     }
   ]
@@ -735,7 +849,7 @@ onUnmounted(() => {
   width: 100%;
   padding: 20px;
   min-height: 100vh;
-  background: #f5f7fa;
+  background-color: var(--color-background-light); /* Use global background color */
 }
 
 .stats-cards {
@@ -743,13 +857,16 @@ onUnmounted(() => {
 }
 
 .stat-card {
-  border: none;
-  border-radius: 12px;
+  border: 1px solid var(--color-border); /* Consistent border */
+  border-radius: 12px; /* Consistent border-radius */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); /* Subtle shadow */
   transition: all 0.3s ease;
+  background-color: var(--color-white); /* Consistent background */
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px); /* Slightly more pronounced hover */
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 }
 
 .stat-content {
@@ -762,7 +879,7 @@ onUnmounted(() => {
   flex-shrink: 0;
   padding: 12px;
   border-radius: 8px;
-  background: rgba(64, 158, 255, 0.1);
+  background: var(--color-background-medium); /* Use medium background for icon area */
 }
 
 .stat-info {
@@ -773,13 +890,13 @@ onUnmounted(() => {
   font-size: 24px;
   font-weight: bold;
   margin: 0 0 4px 0;
-  color: #303133;
+  color: var(--color-text-primary); /* Use primary text color */
 }
 
 .stat-label {
   font-size: 14px;
   margin: 0 0 4px 0;
-  color: #606266;
+  color: var(--color-text-secondary); /* Use secondary text color */
 }
 
 .stat-change {
@@ -788,11 +905,11 @@ onUnmounted(() => {
 }
 
 .stat-change.positive {
-  color: #67c23a;
+  color: var(--color-success); /* Use success color */
 }
 
 .stat-change.negative {
-  color: #f56c6c;
+  color: var(--color-error); /* Use error color */
 }
 
 .charts-grid {
@@ -800,15 +917,20 @@ onUnmounted(() => {
 }
 
 .chart-card {
-  border: none;
-  border-radius: 12px;
+  border: 1px solid var(--color-border); /* Consistent border */
+  border-radius: 12px; /* Consistent border-radius */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); /* Subtle shadow */
+  background-color: var(--color-white); /* Consistent background */
 }
 
 .card-header {
   display: flex;
-  justify-content: between;
+  justify-content: space-between; /* Changed to space-between for better alignment */
   align-items: center;
   gap: 12px;
+  padding-bottom: 16px; /* Add padding to header bottom */
+  border-bottom: 1px solid var(--color-border); /* Add subtle border */
+  margin-bottom: 16px; /* Add margin below border */
 }
 
 .chart-container {
@@ -830,14 +952,14 @@ onUnmounted(() => {
 .realtime-label {
   font-size: 14px;
   font-weight: 500;
-  color: #606266;
+  color: var(--color-text-secondary); /* Use secondary text color */
   margin-bottom: 8px;
 }
 
 .realtime-value {
   font-size: 20px;
   font-weight: bold;
-  color: #303133;
+  color: var(--color-text-primary); /* Use primary text color */
 }
 
 .device-status {
@@ -852,16 +974,17 @@ onUnmounted(() => {
   gap: 8px;
   padding: 8px 12px;
   border-radius: 6px;
-  background: #f8f9fa;
+  background: var(--color-background-medium); /* Use medium background */
   font-size: 13px;
+  color: var(--color-text-primary); /* Primary text color */
 }
 
 .device-item.online {
-  border-left: 3px solid #67c23a;
+  border-left: 3px solid var(--color-success); /* Use success color */
 }
 
 .device-item.offline {
-  border-left: 3px solid #f56c6c;
+  border-left: 3px solid var(--color-error); /* Use error color */
 }
 
 .system-load {
@@ -879,15 +1002,17 @@ onUnmounted(() => {
 .load-item span {
   width: 40px;
   font-size: 12px;
-  color: #606266;
+  color: var(--color-text-secondary); /* Secondary text color */
 }
 
 .footer-info {
   margin-top: 24px;
   padding: 16px;
-  background: white;
+  background: var(--color-white); /* Consistent background */
   border-radius: 8px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--color-border); /* Consistent border */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03); /* Lighter shadow */
+  color: var(--color-text-secondary); /* Secondary text color */
 }
 
 /* Responsive design */

@@ -1,4 +1,4 @@
-import { ref, reactive, onUnmounted } from 'vue'
+import { ref, reactive, onUnmounted, readonly } from 'vue'
 import type { Ref } from 'vue'
 import { ElMessage, ElNotification } from 'element-plus'
 
@@ -31,7 +31,8 @@ export interface WebSocketState {
 }
 
 // Default configuration
-const DEFAULT_CONFIG: Required<Omit<WebSocketConfig, 'url' | 'protocols'>> = {
+const DEFAULT_CONFIG: Required<Omit<WebSocketConfig, 'url'>> = {
+  protocols: [], // Add protocols with an empty array as default
   reconnect: true,
   reconnectInterval: 5000,
   maxReconnectAttempts: 10,
@@ -554,4 +555,3 @@ export function disconnectAllWebSockets(): void {
 
 // Export types and classes for advanced usage
 export { WebSocketConnection, WebSocketManager }
-export type { WebSocketMessage, WebSocketConfig, WebSocketState }

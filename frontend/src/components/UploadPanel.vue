@@ -8,6 +8,7 @@
             :type="uploadMode === 'direct' ? 'primary' : 'default'"
             size="small"
             @click="uploadMode = uploadMode === 'direct' ? 'presigned' : 'direct'"
+            style="margin-left: 16px;"   
           >
             {{ uploadMode === 'direct' ? '直接上传' : '预签名上传' }}
           </el-button>

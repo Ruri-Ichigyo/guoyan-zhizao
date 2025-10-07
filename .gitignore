@@ -222,3 +222,4 @@ __marimo__/
 #secrets
 k8s/
 secrets.yaml
+node_modules

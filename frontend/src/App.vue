@@ -1,32 +1,18 @@
 <template>
   <div id="app">
     <el-container class="min-h-screen">
-      <!-- Header -->
-      <el-header class="bg-blue-600 text-white flex items-center justify-between px-6">
-        <div class="flex items-center">
-          <el-icon class="text-2xl mr-3"><Apple /></el-icon>
-          <h1 class="text-xl font-bold">果蔬智能分拣系统</h1>
-        </div>
-        <div class="flex items-center space-x-4">
-          <el-badge :value="liveJobsCount" :hidden="liveJobsCount === 0" class="mr-2">
-            <el-button type="primary" :icon="Monitor" @click="toggleLiveView">
-              {{ showLiveView ? '关闭实时' : '实时监控' }}
-            </el-button>
-          </el-badge>
-          <el-button type="success" :icon="Setting" @click="showSettings = true">
-            设置
-          </el-button>
-        </div>
-      </el-header>
-
-      <el-container>
+      <el-container class="min-h-screen app-background">
         <!-- Sidebar -->
-        <el-aside width="250px" class="bg-gray-100 border-r">
+        <el-aside width="250px" class="sidebar-background border-r border-transparent">
           <el-menu
             :default-active="$route.path"
             router
-            class="h-full"
+            class="h-full bg-transparent border-r-0"
           >
+            <el-menu-item index="/">
+              <el-icon><HomeFilled /></el-icon>
+              <span>首页</span>
+            </el-menu-item>
             <el-menu-item index="/upload">
               <el-icon><Upload /></el-icon>
               <span>图像上传</span>
@@ -51,21 +37,31 @@
         </el-aside>
 
         <!-- Main Content -->
-        <el-main class="p-6">
-          <!-- Live Status Bar -->
-          <div v-if="showLiveView" class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center">
-                <el-icon class="text-green-500 mr-2 animate-pulse"><VideoCamera /></el-icon>
-                <span class="text-green-700 font-medium">实时监控已启动</span>
-              </div>
-              <div class="text-sm text-gray-600">
-                连接状态: <span :class="wsConnected ? 'text-green-600' : 'text-red-600'">
-                  {{ wsConnected ? '已连接' : '已断开' }}
-                </span>
-              </div>
+        <el-main class="p-6 main-content-background">
+          <!-- Live Status Bar (Redesigned) -->
+          <div v-if="showLiveView" class="live-status-bar mb-4 p-3 rounded-lg flex items-center justify-between">
+            <div class="flex items-center">
+              <el-icon class="live-status-icon mr-2 animate-pulse"><VideoCamera /></el-icon>
+              <span class="live-status-text font-medium">实时监控已启动</span>
+            </div>
+            <div class="text-sm text-gray-600">
+              连接状态: <span :class="wsConnected ? 'text-green-600' : 'text-red-600'">
+                {{ wsConnected ? '已连接' : '已断开' }}
+              </span>
+              <el-spinner v-if="showLiveView && !wsConnected" size="small" class="ml-2" />
             </div>
           </div>
+
+          <!-- WebSocket Error Alert -->
+          <el-alert
+            v-if="wsError"
+            :title="wsError"
+            type="error"
+            show-icon
+            closable
+            class="mb-4"
+            @close="wsError = null"
+          />
 
           <!-- Router View -->
           <router-view />
@@ -99,21 +95,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useJobStore } from './stores/job'
-import { connectWebSocket, disconnectWebSocket, isConnected } from './websocket'
+// If './websocket' exports a default object with these methods:
+// Import the required named exports from './websocket'
+import { useWebSocket, disconnectAllWebSockets } from './websocket'
+// If you need connectWebSocket, ensure it is exported from './websocket.ts'
 import {
   Apple, Monitor, Setting, Upload, Camera, DataAnalysis, List,
-  Operation, VideoCamera
+  Operation, VideoCamera, HomeFilled
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const jobStore = useJobStore()
+const { connect, disconnect, onMessage, state: wsState } = useWebSocket('live')
 
 const showLiveView = ref(false)
-const showSettings = ref(false)
-const wsConnected = ref(false)
+const showSettings = ref<boolean>(false)
+const wsConnected = ref(false) // This will be derived from wsState.connected
+const wsError = ref<string | null>(null) // New: To store WebSocket connection errors
 const liveJobsCount = ref(0)
 
 const settings = ref({
@@ -122,14 +123,15 @@ const settings = ref({
   refreshInterval: 10000
 })
 
-const toggleLiveView = () => {
+const toggleLiveView = async () => {
   showLiveView.value = !showLiveView.value
+  wsError.value = null // Clear previous errors
 
   if (showLiveView.value) {
-    connectWebSocket(settings.value.wsEndpoint, (message) => {
-      // Handle WebSocket messages
-      if (message.type === 'detection_result') {
-        jobStore.updateJob(message.data)
+    try {
+      await connect(settings.value.wsEndpoint)
+      onMessage('detection_result', (data: any) => {
+        jobStore.updateJob(data)
         liveJobsCount.value = jobStore.activeJobs.length
       }
     })
@@ -154,22 +156,92 @@ const loadSettings = () => {
 
 onMounted(() => {
   loadSettings()
-  router.push('/upload')
-
-  // Check WebSocket connection status periodically
-  setInterval(() => {
-    wsConnected.value = isConnected()
-  }, 1000)
+  // No longer push to /upload by default, as we now have a home page
 })
 
 onUnmounted(() => {
-  disconnectWebSocket()
+  disconnect()
 })
+
+// Watch wsState to update wsConnected
+watch(() => wsState.value.connected, (newVal: boolean) => {
+  wsConnected.value = newVal
+})
+
 </script>
 
 <style>
 #app {
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #2c3e50;
+}
+
+.app-background {
+  background-color: var(--color-background-light); /* Use new light background color */
+  position: relative;
+  overflow: hidden;
+}
+
+/* Removed .app-background::before for a cleaner look */
+
+.sidebar-background {
+  background-color: var(--color-white); /* Solid white for sidebar */
+  border-right: 1px solid var(--color-border); /* Use new border color */
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05); /* Subtle shadow */
+}
+
+.el-menu-item {
+  color: var(--color-text-secondary); /* Use secondary text color */
+  font-weight: 500; /* Slightly less bold */
+  font-size: 15px; /* Slightly smaller font */
+  border-radius: 8px; /* Add border-radius for menu items */
+  margin: 4px 8px; /* Add some margin */
+  padding-left: 16px !important; /* Adjust padding */
+}
+
+.el-menu-item.is-active {
+  background-color: var(--color-primary-light) !important; /* Use primary light for active background */
+  color: var(--color-white) !important; /* White text for active item */
+  border-left: none; /* Remove left border */
+  box-shadow: 0 2px 8px rgba(46, 204, 113, 0.2); /* Subtle shadow for active item */
+}
+
+.el-menu-item:hover {
+  background-color: var(--color-primary-light) !important; /* Use primary light for hover */
+  color: var(--color-white) !important; /* White text on hover */
+}
+
+.el-menu-item .el-icon {
+  color: var(--color-text-secondary); /* Secondary text color for icons */
+  font-size: 18px; /* Adjust icon size */
+}
+
+.el-menu-item.is-active .el-icon {
+  color: var(--color-white) !important; /* White icon for active item */
+}
+
+.main-content-background {
+  background-color: var(--color-white); /* Solid white for main content */
+  border-radius: 12px; /* Slightly larger border-radius */
+  margin: 16px; /* Adjust margin */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* More subtle shadow */
+}
+
+.live-status-bar {
+  background: linear-gradient(90deg, var(--color-primary-light) 0%, var(--color-primary) 100%);
+  color: var(--color-white);
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
+}
+
+.live-status-icon {
+  color: var(--color-white);
+  font-size: 20px;
+}
+
+.live-status-text {
+  color: var(--color-white);
 }
 
 .animate-pulse {
