@@ -133,14 +133,12 @@ const toggleLiveView = async () => {
       onMessage('detection_result', (data: any) => {
         jobStore.updateJob(data)
         liveJobsCount.value = jobStore.activeJobs.length
-      })
-    } catch (error: any) {
-      console.error('WebSocket connection error:', error)
-      wsError.value = `WebSocket连接失败: ${error.message || '未知错误'}`
-      showLiveView.value = false // Turn off live view if connection fails
-    }
+      }
+    })
+    wsConnected.value = true // Assume connected immediately after calling connectWebSocket
   } else {
-    disconnect()
+    disconnectWebSocket()
+    wsConnected.value = false // Assume disconnected immediately after calling disconnectWebSocket
   }
 }
 
