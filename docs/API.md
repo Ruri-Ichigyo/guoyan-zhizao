@@ -2,12 +2,26 @@
 
 ## 概览
 
-果蔬智能分拣系统提供完整的 RESTful API 和 WebSocket 接口，支持文件上传、AI 推理、结果查询和实时通信。
+果蔬智能分拣系统采用微服务架构，提供完整的 RESTful API 和 WebSocket 接口，支持文件上传、AI 推理、结果查询和实时通信。
+
+### 服务架构
+
+- **上传服务 (Upload Service)**: 负责文件上传和预签名 URL 生成
+- **查询服务 (Query Service)**: 处理检测结果查询和 WebSocket 实时推送
+- **分拣服务 (Sort Service)**: 控制分拣设备和管理分拣任务
+- **API 网关 (Kong)**: 统一入口和路由代理
+
+> **注意**: 目前部分功能仍在开发中，如统计数据、数据导出、分片上传等。已实现的功能包括基本的文件上传、结果查询和分拣控制。
 
 ## 基础信息
 
-- **Base URL**: `http://localhost:8000`
-- **WebSocket URL**: `ws://localhost:8000/ws`
+果蔬智能分拣系统采用微服务架构，各服务运行在不同端口：
+
+- **上传服务**: `http://localhost:3001` (文件上传和预签名 URL)
+- **查询服务**: `http://localhost:3002` (结果查询和 WebSocket)
+- **分拣服务**: `http://localhost:3003` (分拣控制和状态)
+- **网关代理**: `http://localhost:8000` (Kong API 网关，统一入口)
+- **WebSocket URL**: `ws://localhost:3002/ws/live`
 - **认证方式**: JWT Token
 - **Content-Type**: `application/json` (除文件上传外)
 
@@ -36,12 +50,13 @@ curl -X POST http://localhost:8000/auth/login \
 上传单个或多个图片文件进行 AI 分析。
 
 ```bash
-curl -X POST http://localhost:8000/api/upload \
+curl -X POST http://localhost:3001/api/upload \
   -H "Authorization: Bearer <token>" \
   -F "file=@/path/to/fruit.jpg"
 ```
 
 **响应:**
+
 ```json
 {
   "upload_id": "upload_12345",
@@ -57,7 +72,7 @@ curl -X POST http://localhost:8000/api/upload \
 获取 MinIO 预签名 URL，用于直接上传到对象存储。
 
 ```bash
-curl -X POST http://localhost:8000/api/presign \
+curl -X POST http://localhost:3001/api/presign \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -67,6 +82,7 @@ curl -X POST http://localhost:8000/api/presign \
 ```
 
 **响应:**
+
 ```json
 {
   "upload_id": "upload_12345",
@@ -75,37 +91,7 @@ curl -X POST http://localhost:8000/api/presign \
 }
 ```
 
-### 3. 分片上传
-
-**POST** `/api/upload/chunk`
-
-用于大文件分片上传。
-
-```bash
-curl -X POST http://localhost:8000/api/upload/chunk \
-  -H "Authorization: Bearer <token>" \
-  -F "file=@/path/to/chunk" \
-  -F "upload_id=upload_12345" \
-  -F "chunk_index=0" \
-  -F "total_chunks=5" \
-  -F "filename=large_fruit.jpg"
-```
-
-### 4. 完成分片上传
-
-**POST** `/api/upload/complete`
-
-完成所有分片的上传。
-
-```bash
-curl -X POST http://localhost:8000/api/upload/complete \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "upload_id": "upload_12345",
-    "filename": "large_fruit.jpg"
-  }'
-```
+````
 
 ## 查询服务 (Query Service)
 
@@ -116,21 +102,28 @@ curl -X POST http://localhost:8000/api/upload/complete \
 获取特定任务的分析结果。
 
 ```bash
-curl -X GET http://localhost:8000/api/result/upload_12345 \
+curl -X GET http://localhost:3002/api/result/upload_12345 \
   -H "Authorization: Bearer <token>"
-```
+````
 
 **响应:**
+
 ```json
 {
   "job_id": "upload_12345",
   "status": "completed",
   "results": [
     {
-      "class_name": "苹果",
+      "class_name": "apple",
       "confidence": 0.95,
       "bbox": [10.0, 20.0, 100.0, 150.0],
       "quality_grade": "A"
+    },
+    {
+      "class_name": "orange",
+      "confidence": 0.89,
+      "bbox": [200.0, 50.0, 300.0, 200.0],
+      "quality_grade": "B"
     }
   ],
   "created_at": "2023-12-01T10:30:00Z"
@@ -144,6 +137,7 @@ curl -X GET http://localhost:8000/api/result/upload_12345 \
 获取分页的结果列表。
 
 **查询参数:**
+
 - `page`: 页码 (默认: 1)
 - `limit`: 每页数量 (默认: 10)
 - `status`: 过滤状态 (`pending`, `processing`, `completed`, `failed`)
@@ -151,16 +145,17 @@ curl -X GET http://localhost:8000/api/result/upload_12345 \
 - `to_date`: 结束日期 (ISO 8601)
 
 ```bash
-curl -X GET "http://localhost:8000/api/results?page=1&limit=20&status=completed" \
+curl -X GET "http://localhost:3002/api/results?page=1&limit=20&status=completed" \
   -H "Authorization: Bearer <token>"
 ```
 
 **响应:**
+
 ```json
 {
   "data": [
     {
-      "job_id": "upload_12345",
+      "job_id": "test-job-1",
       "status": "completed",
       "total_fruits": 15,
       "grade_a": 8,
@@ -172,64 +167,10 @@ curl -X GET "http://localhost:8000/api/results?page=1&limit=20&status=completed"
   "pagination": {
     "page": 1,
     "limit": 20,
-    "total": 100,
-    "pages": 5
+    "total": 1,
+    "pages": 1
   }
 }
-```
-
-### 3. 获取统计数据
-
-**GET** `/api/statistics`
-
-获取系统统计信息。
-
-**查询参数:**
-- `range`: 时间范围 (`1h`, `24h`, `7d`, `30d`)
-
-```bash
-curl -X GET "http://localhost:8000/api/statistics?range=24h" \
-  -H "Authorization: Bearer <token>"
-```
-
-**响应:**
-```json
-{
-  "total_processed": 1250,
-  "accuracy_rate": 0.952,
-  "average_processing_time": 2.3,
-  "grade_distribution": {
-    "A": 620,
-    "B": 430,
-    "C": 200
-  },
-  "defect_types": {
-    "表面划痕": 85,
-    "色泽不均": 62,
-    "形状异常": 43,
-    "腐烂斑点": 10
-  },
-  "processing_trend": [
-    {"time": "2023-12-01T00:00:00Z", "count": 52},
-    {"time": "2023-12-01T01:00:00Z", "count": 48}
-  ]
-}
-```
-
-### 4. 导出结果
-
-**GET** `/api/results/export`
-
-导出结果数据。
-
-**查询参数:**
-- `format`: 导出格式 (`csv`, `json`, `xml`)
-- 其他过滤参数同 `/api/results`
-
-```bash
-curl -X GET "http://localhost:8000/api/results/export?format=csv&from_date=2023-12-01" \
-  -H "Authorization: Bearer <token>" \
-  -o results.csv
 ```
 
 ## 分拣控制服务 (Sort Service)
@@ -241,7 +182,7 @@ curl -X GET "http://localhost:8000/api/results/export?format=csv&from_date=2023-
 控制分拣设备。
 
 ```bash
-curl -X POST http://localhost:8000/api/sort/command \
+curl -X POST http://localhost:3003/api/sort/command \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -253,6 +194,7 @@ curl -X POST http://localhost:8000/api/sort/command \
 ```
 
 **可用命令:**
+
 - `start`: 开始分拣
 - `stop`: 停止分拣
 - `pause`: 暂停分拣
@@ -260,10 +202,11 @@ curl -X POST http://localhost:8000/api/sort/command \
 - `emergency_stop`: 紧急停止
 
 **响应:**
+
 ```json
 {
   "success": true,
-  "message": "分拣已成功启动",
+  "message": "Sorting started successfully",
   "status": {
     "job_id": "sort_12345",
     "status": "running",
@@ -282,19 +225,20 @@ curl -X POST http://localhost:8000/api/sort/command \
 获取当前分拣设备状态。
 
 ```bash
-curl -X GET http://localhost:8000/api/sort/status \
+curl -X GET http://localhost:3003/api/sort/status \
   -H "Authorization: Bearer <token>"
 ```
 
 **响应:**
+
 ```json
 {
-  "job_id": "sort_12345",
-  "status": "running",
-  "conveyor_speed": 75,
-  "sorted_count": 324,
-  "error_count": 2,
-  "uptime": 3600
+  "job_id": "current-job",
+  "status": "idle",
+  "conveyor_speed": 0,
+  "sorted_count": 0,
+  "error_count": 0,
+  "uptime": 0
 }
 ```
 
@@ -305,7 +249,7 @@ curl -X GET http://localhost:8000/api/sort/status \
 更新分拣设备配置。
 
 ```bash
-curl -X PUT http://localhost:8000/api/sort/config \
+curl -X PUT http://localhost:3003/api/sort/config \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -327,31 +271,33 @@ curl -X PUT http://localhost:8000/api/sort/config \
 连接到 WebSocket 获取实时更新。
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/live');
+const ws = new WebSocket("ws://localhost:3002/ws/live");
 
-ws.onmessage = function(event) {
+ws.onmessage = function (event) {
   const data = JSON.parse(event.data);
-  console.log('Real-time update:', data);
+  console.log("Real-time update:", data);
 };
 
 // 发送心跳
 setInterval(() => {
-  ws.send('ping');
+  ws.send("ping");
 }, 30000);
 ```
 
 ### WebSocket 消息类型
 
 #### 1. 连接确认
+
 ```json
 {
   "type": "connected",
-  "message": "连接到实时检测流成功",
+  "message": "Connected to live detection feed",
   "timestamp": "2023-12-01T10:30:00Z"
 }
 ```
 
 #### 2. 检测结果更新
+
 ```json
 {
   "type": "detection_result",
@@ -365,6 +311,7 @@ setInterval(() => {
 ```
 
 #### 3. 分拣状态更新
+
 ```json
 {
   "type": "sort_status",
@@ -378,6 +325,7 @@ setInterval(() => {
 ```
 
 #### 4. 系统警报
+
 ```json
 {
   "type": "alert",
@@ -388,6 +336,7 @@ setInterval(() => {
 ```
 
 #### 5. 心跳响应
+
 ```json
 {
   "type": "pong",
@@ -438,7 +387,9 @@ setInterval(() => {
 from guoyan_client import FruitSortClient
 
 client = FruitSortClient(
-    base_url='http://localhost:8000',
+    upload_url='http://localhost:3001',
+    query_url='http://localhost:3002',
+    sort_url='http://localhost:3003',
     token='your-jwt-token'
 )
 
@@ -454,11 +405,13 @@ print(f"Detected fruits: {len(analysis['results'])}")
 ### JavaScript SDK
 
 ```javascript
-import { FruitSortClient } from '@guoyan/client';
+import { FruitSortClient } from "@guoyan/client";
 
 const client = new FruitSortClient({
-  baseURL: 'http://localhost:8000',
-  token: 'your-jwt-token'
+  uploadURL: "http://localhost:3001",
+  queryURL: "http://localhost:3002",
+  sortURL: "http://localhost:3003",
+  token: "your-jwt-token",
 });
 
 // 上传文件
@@ -466,9 +419,9 @@ const result = await client.uploadFile(fileInput.files[0]);
 console.log(`Upload ID: ${result.upload_id}`);
 
 // WebSocket 连接
-const ws = client.connectWebSocket();
-ws.on('detection_result', (data) => {
-  console.log('New result:', data);
+const ws = client.connectWebSocket("ws://localhost:3002/ws/live");
+ws.on("detection_result", (data) => {
+  console.log("New result:", data);
 });
 ```
 
@@ -491,15 +444,33 @@ ws.on('detection_result', (data) => {
 
 ### 健康检查
 
+各服务都提供健康检查端点：
+
 ```bash
+# 上传服务
+curl -X GET http://localhost:3001/health
+
+# 查询服务
+curl -X GET http://localhost:3002/health
+
+# 分拣服务
+curl -X GET http://localhost:3003/health
+
+# 通过网关访问
 curl -X GET http://localhost:8000/health
+```
+
+**响应:**
+
+```json
+{
+  "status": "ok"
+}
 ```
 
 ### 指标端点
 
-```bash
-curl -X GET http://localhost:8000/metrics
-```
+目前各服务为独立部署，指标收集需要通过单独配置实现。可以通过 Prometheus 等工具收集各服务的运行指标。
 
 ### 日志格式
 

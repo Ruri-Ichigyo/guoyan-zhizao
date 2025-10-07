@@ -1,3 +1,8 @@
+//! # WebSocket Module
+//!
+//! 查询服务的WebSocket处理模块，实现实时数据推送功能。
+//! 支持多客户端连接和广播消息，主要用于实时推送检测结果和系统状态更新。
+
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -7,10 +12,23 @@ use axum::{
 };
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use serde_json::json;
-use tracing::{info, error, warn};
+use tracing::{info, error};
 
 use crate::SharedState;
 
+/// WebSocket连接处理函数
+/// 
+/// 处理WebSocket升级请求，将HTTP连接升级为WebSocket连接。
+/// 每个新的WebSocket连接都会启动一个独立的处理任务。
+/// 
+/// # Arguments
+/// 
+/// * `ws` - WebSocket升级请求
+/// * `state` - 应用程序共享状态，包含广播频道
+/// 
+/// # Returns
+/// 
+/// 返回HTTP响应，完成WebSocket升级
 pub async fn websocket_handler(
     ws: WebSocketUpgrade,
     State(state): State<SharedState>,
@@ -18,6 +36,18 @@ pub async fn websocket_handler(
     ws.on_upgrade(|socket| websocket_connection(socket, state))
 }
 
+/// WebSocket连接的主处理函数
+/// 
+/// 处理单个WebSocket连接的生命周期，包括：
+/// - 发送欢迎消息
+/// - 处理来自客户端的消息
+/// - 转发广播消息给客户端
+/// - 处理ping/pong心跳检测
+/// 
+/// # Arguments
+/// 
+/// * `socket` - WebSocket连接对象
+/// * `state` - 应用程序共享状态
 async fn websocket_connection(socket: WebSocket, state: SharedState) {
     let (mut sender, mut receiver) = socket.split();
     let mut rx = state.tx.subscribe();
