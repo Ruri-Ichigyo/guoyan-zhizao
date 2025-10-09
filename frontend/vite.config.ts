@@ -14,14 +14,9 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/api/v1': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false
-      },
-      '/api/v1/ws': {
-        target: 'ws://localhost:8000',
-        ws: true,
-        changeOrigin: true
       }
     }
   },
@@ -33,8 +28,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           'element-plus': ['element-plus'],
-          'echarts': ['echarts', 'vue-echarts'],
-          'vue-vendor': ['vue', 'vue-router', 'pinia']
+          'vue-vendor': ['vue', 'vue-router']
         }
       }
     }

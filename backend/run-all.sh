@@ -1,24 +1,22 @@
 #!/bin/bash
 
-# Start all services in parallel for development
-echo "Starting all services..."
+set -euo pipefail
 
-cargo run --bin upload-svc &
-UPLOAD_PID=$!
+echo "启动后端服务 (单进程)..."
 
-cargo run --bin query-svc &
-QUERY_PID=$!
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "请先设置 DATABASE_URL 环境变量"
+  exit 1
+fi
 
-cargo run --bin sort-svc &
-SORT_PID=$!
+if [ -z "${REDIS_URL:-}" ]; then
+  echo "请先设置 REDIS_URL 环境变量"
+  exit 1
+fi
 
-echo "Services started:"
-echo "  Upload service (PID: $UPLOAD_PID) on port 3001"
-echo "  Query service (PID: $QUERY_PID) on port 3002"
-echo "  Sort service (PID: $SORT_PID)"
-echo ""
-echo "Press Ctrl+C to stop all services"
+if [ -z "${AI_SERVICE_URL:-}" ]; then
+  echo "请先设置 AI_SERVICE_URL 环境变量"
+  exit 1
+fi
 
-# Wait for Ctrl+C
-trap "kill $UPLOAD_PID $QUERY_PID $SORT_PID; exit" INT
-wait
+cargo run

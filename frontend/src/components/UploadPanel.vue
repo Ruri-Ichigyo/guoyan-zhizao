@@ -1,286 +1,316 @@
 <template>
-  <div class="upload-panel">
-    <el-card>
+  <div class="upload-wrapper">
+    <el-card class="upload-card" shadow="hover">
       <template #header>
-        <div class="flex items-center justify-between">
-          <span class="text-lg font-medium">图像上传与检测</span>
-          <el-button
-            :type="uploadMode === 'direct' ? 'primary' : 'default'"
-            size="small"
-            @click="uploadMode = uploadMode === 'direct' ? 'presigned' : 'direct'"
-            style="margin-left: 16px;"   
-          >
-            {{ uploadMode === 'direct' ? '直接上传' : '预签名上传' }}
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">图像上传</h2>
+            <p class="card-subtitle">上传果蔬图片并触发 AI 分析</p>
+          </div>
+          <el-button type="primary" :loading="uploading" @click="openFileDialog">
+            <el-icon class="mr-1"><UploadFilled /></el-icon>
+            选择图片
           </el-button>
+          <input
+            ref="fileInput"
+            type="file"
+            accept="image/*"
+            class="hidden-input"
+            @change="handleFileChange"
+          />
         </div>
       </template>
 
-      <!-- Upload Area -->
-      <el-upload
-        ref="uploadRef"
-        class="upload-demo"
-        drag
-        :multiple="true"
-        :show-file-list="false"
-        :before-upload="handleBeforeUpload"
-        :http-request="handleUpload"
-        accept="image/*"
-      >
-        <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
-        <div class="el-upload__text">
-          将文件拖到此处，或 <em>点击上传</em>
-        </div>
-        <template #tip>
-          <div class="el-upload__tip text-gray-500">
-            支持 jpg/png/gif 格式，单个文件大小不超过 10MB
-          </div>
-        </template>
-      </el-upload>
-
-      <!-- Upload Progress -->
-      <div v-if="uploadingFiles.length > 0" class="mt-4">
-        <h4 class="mb-2">上传进度</h4>
-        <div v-for="file in uploadingFiles" :key="file.id" class="mb-3 p-3 border rounded">
-          <div class="flex items-center justify-between mb-2">
-            <span class="font-medium">{{ file.name }}</span>
-            <span class="text-sm text-gray-500">{{ formatFileSize(file.size) }}</span>
-          </div>
-          <el-progress
-            :percentage="file.progress"
-            :status="file.status === 'error' ? 'exception' : undefined"
-          />
-          <div class="text-sm text-gray-500 mt-1">
-            状态: {{ getStatusText(file.status) }}
-          </div>
-        </div>
+      <div v-if="uploading" class="upload-state">
+        <el-skeleton animated />
+        <p class="mt-3 text-slate-500">正在上传并分析，请稍候…</p>
       </div>
 
-      <!-- Recent Uploads -->
-      <div v-if="recentUploads.length > 0" class="mt-6">
-        <h4 class="mb-4">最近上传</h4>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div
-            v-for="upload in recentUploads"
-            :key="upload.upload_id"
-            class="border rounded-lg p-4"
-          >
-            <div class="flex items-center justify-between mb-2">
-              <span class="font-medium text-sm">{{ upload.filename }}</span>
-              <el-tag :type="getStatusColor(upload.status)" size="small">
-                {{ upload.status }}
-              </el-tag>
-            </div>
-            <div class="text-xs text-gray-500 mb-3">
-              {{ formatTime(upload.created_at) }}
-            </div>
-            <div class="flex justify-between">
-              <el-button
-                size="small"
-                @click="viewResult(upload.upload_id)"
-                :disabled="upload.status !== 'completed'"
-              >
-                查看结果
-              </el-button>
-              <el-button
-                size="small"
-                type="danger"
-                @click="deleteUpload(upload.upload_id)"
-              >
-                删除
-              </el-button>
-            </div>
+      <div v-else-if="uploadError" class="upload-error">
+        <el-result icon="error" title="上传失败" :sub-title="uploadError">
+          <template #extra>
+            <el-button type="primary" @click="resetError">重新上传</el-button>
+          </template>
+        </el-result>
+      </div>
+
+      <div v-else-if="lastResult" class="upload-result">
+        <div class="result-header">
+          <div>
+            <h3>最近一次分析</h3>
+            <p class="meta">
+              任务 ID：{{ lastResult.upload_id }} · 上传时间：{{ formatDate(lastResult.created_at) }}
+            </p>
           </div>
+          <el-tag type="success">{{ lastResult.status }}</el-tag>
         </div>
+
+        <el-row :gutter="12" class="result-summary">
+          <el-col :span="6">
+            <el-statistic title="识别总数" :value="lastResult.total_fruits" />
+          </el-col>
+          <el-col :span="6">
+            <el-statistic title="A级" :value="lastResult.grade_a" />
+          </el-col>
+          <el-col :span="6">
+            <el-statistic title="B级" :value="lastResult.grade_b" />
+          </el-col>
+          <el-col :span="6">
+            <el-statistic title="C级" :value="lastResult.grade_c" />
+          </el-col>
+        </el-row>
+
+        <el-table :data="lastResult.detections" border stripe>
+          <el-table-column prop="class_name" label="类别" />
+          <el-table-column label="置信度">
+            <template #default="{ row }">
+              <el-progress :percentage="Math.round(row.confidence * 100)" />
+            </template>
+          </el-table-column>
+          <el-table-column prop="quality_grade" label="质量等级" width="110">
+            <template #default="{ row }">
+              <el-tag :type="gradeTag(row.quality_grade)" size="small">
+                {{ row.quality_grade }}
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <div v-else class="upload-placeholder">
+        <el-empty description="选择或拖入图片以开始分析">
+          <el-button type="primary" @click="openFileDialog">立即上传</el-button>
+        </el-empty>
       </div>
     </el-card>
+
+    <el-card v-if="recentResults.length" class="recent-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">最近任务</h3>
+            <p class="card-subtitle">展示最近 5 条检测记录</p>
+          </div>
+          <el-button type="text" @click="$router.push('/results')">查看全部</el-button>
+        </div>
+      </template>
+
+      <el-table :data="recentResults" size="small">
+        <el-table-column prop="filename" label="文件名" min-width="140" />
+        <el-table-column prop="status" label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag :type="statusTag(row.status)" size="small">{{ row.status }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="total_fruits" label="识别数量" width="110" />
+        <el-table-column label="上传时间" width="160">
+          <template #default="{ row }">
+            {{ formatDate(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="110">
+          <template #default="{ row }">
+            <el-button size="small" type="primary" text @click="viewDetail(row.upload_id)">
+              查看详情
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-dialog
+      v-model="detailVisible"
+      width="600px"
+      :title="dialogResult?.filename ?? '检测详情'"
+    >
+      <template v-if="dialogResult">
+        <p class="meta">
+          任务 ID：{{ dialogResult.upload_id }} · {{ formatDate(dialogResult.created_at) }}
+        </p>
+        <el-table :data="dialogResult.detections" stripe style="margin-top: 1rem">
+          <el-table-column prop="class_name" label="类别" />
+          <el-table-column label="置信度">
+            <template #default="{ row }">
+              {{ (row.confidence * 100).toFixed(1) }}%
+            </template>
+          </el-table-column>
+          <el-table-column prop="quality_grade" label="质量等级" width="100" />
+        </el-table>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
+
+import type { DetailedResult, ResultSummary } from '@/api/result'
+import { resultApi } from '@/api/result'
+import type { UploadResult } from '@/api/upload'
 import { uploadApi } from '@/api/upload'
-import { useJobStore } from '@/stores/job'
-import type { UploadFile, UploadRequestOptions } from 'element-plus'
 
-const jobStore = useJobStore()
+const uploading = ref(false)
+const uploadError = ref<string | null>(null)
+const lastResult = ref<UploadResult | null>(null)
+const recentResults = ref<ResultSummary[]>([])
+const detailVisible = ref(false)
+const dialogResult = ref<DetailedResult | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
 
-const uploadMode = ref<'direct' | 'presigned'>('direct')
-const uploadingFiles = ref<any[]>([])
-const recentUploads = ref<any[]>([])
-
-const handleBeforeUpload = (file: File) => {
-  // Validate file type
-  const isImage = file.type.startsWith('image/')
-  if (!isImage) {
-    ElMessage.error('只能上传图片文件!')
-    return false
-  }
-
-  // Validate file size (10MB)
-  const isLt10M = file.size / 1024 / 1024 < 10
-  if (!isLt10M) {
-    ElMessage.error('上传文件大小不能超过 10MB!')
-    return false
-  }
-
-  return true
+const openFileDialog = () => {
+  fileInput.value?.click()
 }
 
-const handleUpload = async (options: UploadRequestOptions) => {
-  const file = options.file
-  const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+const resetError = () => {
+  uploadError.value = null
+}
 
-  const uploadItem = {
-    id: uploadId,
-    name: file.name,
-    size: file.size,
-    progress: 0,
-    status: 'uploading' as 'uploading' | 'completed' | 'error'
+const handleFileChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  if (!input.files || input.files.length === 0) return
+
+  const file = input.files[0]
+  if (!file.type.startsWith('image/')) {
+    ElMessage.error('仅支持图片文件')
+    return
   }
 
-  uploadingFiles.value.push(uploadItem)
-
+  uploadError.value = null
+  uploading.value = true
   try {
-    let result
-
-    if (uploadMode.value === 'direct') {
-      // Direct upload
-      result = await uploadApi.uploadFile(file)
-    } else {
-      // Presigned URL upload
-      const presignResult = await uploadApi.getPresignedUrl({
-        filename: file.name,
-        content_type: file.type
-      })
-
-      if (presignResult.presigned_url) {
-        await uploadApi.uploadToPresignedUrl(presignResult.presigned_url, file)
-        result = presignResult
-      }
-    }
-
-    uploadItem.progress = 100
-    uploadItem.status = 'completed'
-
-    // Add to recent uploads
-    recentUploads.value.unshift({
-      upload_id: result.upload_id,
-      filename: file.name,
-      status: result.status,
-      created_at: new Date().toISOString()
-    })
-
-    // Store in job store
-    jobStore.addJob({
-      id: result.upload_id,
-      filename: file.name,
-      status: result.status,
-      progress: 0,
-      createdAt: new Date()
-    })
-
-    ElMessage.success('文件上传成功!')
-
+    const response = await uploadApi.uploadFile(file)
+    lastResult.value = response
+    ElMessage.success('上传并分析完成')
+    await loadRecentResults()
   } catch (error) {
-    console.error('Upload failed:', error)
-    uploadItem.status = 'error'
-    ElMessage.error('文件上传失败!')
+    console.error(error)
+    uploadError.value = '上传或分析失败，请稍后重试'
+  } finally {
+    uploading.value = false
+    if (input) input.value = ''
   }
-
-  // Remove from uploading list after a delay
-  setTimeout(() => {
-    const index = uploadingFiles.value.findIndex(f => f.id === uploadId)
-    if (index !== -1) {
-      uploadingFiles.value.splice(index, 1)
-    }
-  }, 3000)
 }
 
-const viewResult = (uploadId: string) => {
-  // Navigate to result view
-  console.log('View result for:', uploadId)
-}
-
-const deleteUpload = async (uploadId: string) => {
+const loadRecentResults = async () => {
   try {
-    await ElMessageBox.confirm('确定要删除这个上传记录吗？', '确认删除', {
-      type: 'warning'
-    })
-
-    // Remove from recent uploads
-    const index = recentUploads.value.findIndex(u => u.upload_id === uploadId)
-    if (index !== -1) {
-      recentUploads.value.splice(index, 1)
-    }
-
-    // Remove from job store
-    jobStore.removeJob(uploadId)
-
-    ElMessage.success('删除成功!')
-  } catch {
-    // User cancelled
+    const payload = await resultApi.getResults({ page: 1, limit: 5 })
+    recentResults.value = payload.data
+  } catch (error) {
+    console.error(error)
   }
 }
 
-const formatFileSize = (bytes: number) => {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-const formatTime = (dateString: string) => {
-  return new Date(dateString).toLocaleString('zh-CN')
-}
-
-const getStatusText = (status: string) => {
-  const statusMap: Record<string, string> = {
-    uploading: '上传中',
-    completed: '已完成',
-    error: '上传失败',
-    processing: '处理中',
-    analyzed: '分析完成'
+const viewDetail = async (uploadId: string) => {
+  try {
+    dialogResult.value = await resultApi.getResult(uploadId)
+    detailVisible.value = true
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('加载详情失败')
   }
-  return statusMap[status] || status
 }
 
-const getStatusColor = (status: string) => {
-  const colorMap: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
-    completed: 'success',
-    processing: 'warning',
-    error: 'danger',
-    uploading: 'info'
-  }
-  return colorMap[status] || 'info'
+const formatDate = (value: string) => {
+  return new Date(value).toLocaleString()
 }
 
-onMounted(() => {
-  // Load recent uploads from localStorage or API
-  const saved = localStorage.getItem('recentUploads')
-  if (saved) {
-    recentUploads.value = JSON.parse(saved)
+const gradeTag = (grade: string) => {
+  switch (grade.toUpperCase()) {
+    case 'A':
+      return 'success'
+    case 'B':
+      return 'warning'
+    case 'C':
+      return 'danger'
+    default:
+      return 'info'
   }
+}
+
+const statusTag = (status: string) => {
+  switch (status) {
+    case 'completed':
+      return 'success'
+    case 'processing':
+      return 'warning'
+    case 'failed':
+      return 'danger'
+    default:
+      return 'info'
+  }
+}
+
+onMounted(async () => {
+  await loadRecentResults()
 })
 </script>
 
 <style scoped>
-.upload-demo {
-  margin: 20px 0;
+.upload-wrapper {
+  display: grid;
+  gap: 1.5rem;
 }
 
-.upload-demo .el-upload {
-  border: 1px dashed var(--el-border-color);
-  border-radius: 6px;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: var(--el-transition-duration-fast);
+.upload-card {
+  border-radius: 16px;
 }
 
-.upload-demo .el-upload:hover {
-  border-color: var(--el-color-primary);
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.card-subtitle {
+  margin: 0.25rem 0 0;
+  color: #738192;
+  font-size: 0.95rem;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.upload-state {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.upload-result {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.result-summary {
+  margin: 0.5rem 0 1rem;
+}
+
+.meta {
+  color: #738192;
+  font-size: 0.9rem;
+}
+
+.recent-card {
+  border-radius: 12px;
+}
+
+.upload-placeholder {
+  padding: 2rem 0;
 }
 </style>

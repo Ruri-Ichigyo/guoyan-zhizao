@@ -4,12 +4,14 @@
 
 当前版本的果蔬智能分拣系统采用 **DenseNet121** 作为核心特征提取与分类模型，通过对整幅果蔬图像进行快速分类，结合传统视觉指标完成质量评估与等级判定。与早期的 YOLO 检测方案相比，DenseNet 提供了更轻量的推理路径，同时保持对类别与外观差异的敏感性。
 
-整体推理流程如下所示：
+整体推理流程如下所示（详见 `docs/PROJECT_GUIDE.md` 与 API 文档）：
 
 ```
-输入图像 → 预处理 → DenseNet 分类 → Top-K 置信度结果
-                                ↓
-                           质量评估 → 综合打分 → 结构化响应
+客户端上传 → Rust 后端持久化 → FastAPI 推理服务
+                                 ↓
+                 预处理 → DenseNet → Top-K 结果
+                                 ↓
+                        质量评估 → 结构化响应
 ```
 
 ## 核心组件
@@ -43,11 +45,12 @@
 
 最终得分映射为质量等级 `A / B / C`，并与分类置信度共同组成响应元数据。
 
-### 4. 消息与存储
+### 4. 推理调用链路
 
-- **MinIO/S3**：原始图片存储，推理服务从 `fruit-images` 桶读取
-- **Kafka**：消费 `image-events` 主题并发布 `inference-results` 主题
-- **元数据**：推理结果会附带 `model_version = densenet121-fruit-v1` 及 `top_k`
+- **Rust 后端**：接收前端上传的图片（二进制存入 PostgreSQL）并调用 AI 服务  
+- **AI 服务**：FastAPI 提供 `POST /infer` 接口，直接接收文件字节并返回分类结果  
+- **缓存层**：后端将推理结果写入 Redis，提升结果查询性能  
+- **结构化响应**：包含 `model_version = densenet121-fruit-v1`、`top_k` 及质量等级指标
 
 ## 数据集准备
 
@@ -128,32 +131,17 @@ ai/model/fruit_densenet_weights.pth
 
 推理服务会自动在该路径查找权重；若文件缺失，则退回至 ImageNet 预训练参数，并提示准确性受限。
 
-## 推理服务实现
+## 推理服务实现概览
 
-核心逻辑位于 `ai/main.py`，流程如下：
+核心逻辑位于 `ai/main.py`：
 
-1. 读取 `labels.json` 并计算 `num_classes` 与 `top_k`  
-2. 初始化 DenseNet121，加载自定义权重  
-3. 消费 Kafka 消息，下载 MinIO 中的原始图片  
-4. 执行预处理、模型推理与 `torch.softmax` 获取概率  
-5. 取 `Top-K` 结果，生成覆盖整幅图像的统一边界框  
-6. 计算质量等级，封装并发布至 `inference-results` 主题
+1. 读取 `labels.json` 并计算 `num_classes` 与 `top_k`。  
+2. 初始化 DenseNet121，加载（可选）自定义权重。  
+3. FastAPI 端点接收 `multipart/form-data` 图像字节并解码为 `numpy.ndarray`。  
+4. 预处理 → 模型推理 → `torch.softmax` 获取概率 → Top-K 取样。  
+5. 计算质量等级，并以统一的 `InferenceResponse` 返回（参见 `docs/API.md`）。
 
-示例伪代码：
-
-```python
-processed = preprocess_image(image, transform).unsqueeze(0).to(device)
-logits = model(processed)
-probs, indices = torch.softmax(logits, dim=1).topk(top_k, dim=1)
-
-for score, cls in zip(probs[0], indices[0]):
-    detections.append({
-        "class_name": labels[int(cls)],
-        "confidence": float(score),
-        "bbox": [0.0, 0.0, width, height],
-        "quality_grade": calculate_quality_grade(image, labels[int(cls)], float(score))
-    })
-```
+与后端交互、缓存策略与表结构详见 `docs/PROJECT_GUIDE.md`。
 
 ## 质量评分细节
 
@@ -204,5 +192,3 @@ for score, cls in zip(probs[0], indices[0]):
 - **CLAHE**：对比度受限自适应直方图均衡 (Contrast Limited Adaptive Histogram Equalization)
 
 ---
-
-> 若需要参考旧版 YOLOv8 目标检测流程，可在项目历史记录中查阅 2024 年之前的文档版本。当前主线仅维护 DenseNet 分类方案。

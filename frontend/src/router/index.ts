@@ -14,24 +14,9 @@ const router = createRouter({
       component: () => import('../components/UploadPanel.vue')
     },
     {
-      path: '/camera',
-      name: 'Camera',
-      component: () => import('../components/LiveCamera.vue')
-    },
-    {
-      path: '/dashboard',
-      name: 'Dashboard',
-      component: () => import('../components/DataDashboard.vue')
-    },
-    {
       path: '/results',
       name: 'Results',
       component: () => import('../views/ResultsView.vue')
-    },
-    {
-      path: '/sort',
-      name: 'Sort',
-      component: () => import('../views/SortView.vue')
     }
   ]
 })

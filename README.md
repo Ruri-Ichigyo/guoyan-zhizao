@@ -1,77 +1,114 @@
-# 果蔬智能分拣系统
+# 果蔬智造核心平台
 
-## 系统架构
+轻量化保留核心功能的果蔬识别系统。平台聚焦于“图像上传 → AI 分析 → 结果查询”流程，采用 Rust 后端 + FastAPI AI 服务，Redis 作为热点缓存，PostgreSQL 负责持久化，前端使用 Vue 3 提供操作界面。
 
-一个基于微服务架构的果蔬智能分拣系统，支持图像上传、AI识别、实时数据展示和分拣控制。
+## 架构速览
 
-### 技术栈
-- **网关**: Kong (JWT认证 + 限流)
-- **后端**: Rust微服务 (Tokio + Axum)
-- **存储**: MinIO对象存储
-- **消息队列**: Apache Kafka
-- **AI推理**: Python + DenseNet121
-- **前端**: Vue3 + TypeScript + Vite
-- **监控**: WebSocket实时通信
+| 组件 | 技术栈 | 说明 |
+| --- | --- | --- |
+| 前端 | Vue 3 + Element Plus | 图像上传、结果列表、检测详情 |
+| 后端 | Rust (Axum) | 统一接入层，存储上传文件、触发 AI 推理、暴露 REST API |
+| AI 服务 | Python (FastAPI + PyTorch) | 处理图像分类并返回检测结果 |
+| 缓存 | Redis | 缓存检测结果，提升查询性能 |
+| 数据库 | PostgreSQL | 存储上传记录、检测结果统计 |
 
-## 快速启动
+## 快速上手
+
+### 1. 环境准备
+
+- Docker Desktop / Docker Engine 20.10+
+- Docker Compose v2
 
 ```bash
-# 克隆项目
-git clone git@github.com:lanshi17/guoyan-zhizao.git
-cd guoyan-zhizao
-
-# 启动所有服务 (Docker Compose)
-docker-compose up -d
-
-# 访问前端
-http://localhost:3000
-
-# API网关
-http://localhost:8000
-
-# 统一 API 前缀
-http://localhost:8000/api/v1
+cp .env.example .env
+./scripts/start.sh
 ```
 
-## 服务端口
+脚本会完成镜像构建并启动以下服务：
 
-| 服务 | 端口 | 描述 |
-|------|------|------|
-| Kong Gateway | 8000 | API网关 |
-| Upload Service | 3001 | 文件上传服务 |
-| Query Service | 3002 | 查询与WebSocket |
-| Sort Service | 3003 | 分拣控制服务 |
-| AI Inference | 3004 | AI推理服务 |
-| Frontend | 3000 | 前端界面 |
-| MinIO | 9000 | 对象存储 |
-| MinIO Console | 9001 | 存储管理界面 |
+- 前端：http://localhost:3000
+- 后端 API：http://localhost:8080/api/v1
+- AI 服务健康检查：http://localhost:8002/health
+- PostgreSQL：`postgres://gyz:gyz123@localhost:5432/gyz`
+- Redis：`redis://localhost:6379`
 
-## 开发指南
+查看运行状态：
 
-### 后端开发
+```bash
+docker compose ps
+docker compose logs -f backend
+```
+
+停止服务：
+
+```bash
+docker compose down
+```
+
+### 2. 本地开发
+
+使用 `./scripts/dev-start.sh` 可快速检查依赖并按需启动基础设施。主要服务开发流程：
+
+#### 后端 (Rust Axum)
 ```bash
 cd backend
-cargo build --release
+export DATABASE_URL=postgres://gyz:gyz123@localhost:5432/gyz
+export REDIS_URL=redis://localhost:6379
+export AI_SERVICE_URL=http://localhost:8002
+cargo run
 ```
 
-### 前端开发
+#### AI 推理服务 (FastAPI)
+```bash
+cd ai
+python -m venv .venv && source .venv/bin/activate  # 可选
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8002
+```
+
+#### 前端 (Vue 3)
 ```bash
 cd frontend
 npm install
 npm run dev
+# 开发代理默认指向 http://localhost:8080
 ```
 
-### AI服务开发
-```bash
-cd ai
-pip install -r requirements.txt
-python main.py
+## API 概要
+
+- `POST /api/v1/uploads`：上传图片并返回检测结果
+- `GET /api/v1/results`：分页查询历史记录
+- `GET /api/v1/results/{id}`：获取单条检测详情
+- `GET /api/v1/statistics`：统计上传与识别概况
+- `GET /health`：服务健康检查
+
+详细说明见 [docs/API.md](docs/API.md)。
+
+## 项目结构
+
+```
+.
+├── ai/            # FastAPI + PyTorch 推理服务
+├── backend/       # Rust 后端，负责数据存储与业务编排
+├── frontend/      # Vue 3 前端界面
+├── docs/          # 项目文档与部署、算法说明
+├── scripts/       # 辅助脚本（启动、环境验证等）
+├── docker-compose.yml
+└── .env.example   # 环境变量示例
 ```
 
-## 部署说明
+## 文档索引
+- [快速启动](docs/QUICKSTART.md)：部署与开发模式操作步骤
+- [项目指南](docs/PROJECT_GUIDE.md)：架构、模块与配置说明
+- [部署手册](docs/DEPLOY.md)：生产发布与运维建议
+- [API 参考](docs/API.md)：REST 接口定义与示例
+- [算法说明](docs/ALGORITHM.md)：模型训练与推理细节
+- [搭建核对](docs/SETUP_REPORT.md)：仓库结构与必备文件检查
 
-详见 [DEPLOY.md](docs/DEPLOY.md) 生产环境部署指南。
+## 下一步
 
-## API文档
+- 为核心流程补充自动化测试
+- 根据实际模型替换 `ai/model` 中的权重与标签
+- 扩展前端展示与权限控制
 
-详见 [API.md](docs/API.md) 完整接口文档。
+欢迎基于该精简架构继续迭代与集成。

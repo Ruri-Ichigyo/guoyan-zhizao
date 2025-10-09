@@ -6,34 +6,29 @@ FROM node:18-alpine as build-stage
 # Set working directory
 WORKDIR /app
 
-# Install pnpm globally (more efficient than npm for monorepos and Docker)
-RUN npm install -g pnpm
-
 # Copy package files first to leverage Docker layer caching
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN npm ci
 
 # Copy source code
 COPY . .
 
 # Build arguments for environment configuration
 ARG NODE_ENV=production
-ARG VITE_API_BASE_URL=http://localhost:8080/api
-ARG VITE_WS_BASE_URL=ws://localhost:8080/ws
-ARG VITE_APP_NAME="果蔬智能分拣系统"
+ARG VITE_API_BASE_URL=http://localhost:8080/api/v1
+ARG VITE_APP_NAME="果蔬智造核心平台"
 ARG VITE_APP_VERSION=1.0.0
 
 # Set environment variables
 ENV NODE_ENV=$NODE_ENV
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-ENV VITE_WS_BASE_URL=$VITE_WS_BASE_URL
 ENV VITE_APP_NAME=$VITE_APP_NAME
 ENV VITE_APP_VERSION=$VITE_APP_VERSION
 
 # Build the application
-RUN pnpm run build
+RUN npm run build
 
 # Production stage
 FROM nginx:1.25-alpine as production-stage
@@ -96,21 +91,6 @@ server {
         proxy_read_timeout 30s;
     }
 
-    # WebSocket proxy (optional - for development/testing)
-    location /api/v1/ws/ {
-        proxy_pass http://backend:8080/api/v1/ws/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_connect_timeout 7d;
-        proxy_send_timeout 7d;
-        proxy_read_timeout 7d;
-    }
-
     # Health check endpoint
     location /health {
         access_log off;
@@ -145,7 +125,6 @@ set -e
 # Substitute environment variables in JavaScript files at runtime
 find /usr/share/nginx/html -name "*.js" -exec sed -i \
     -e "s|__VITE_API_BASE_URL__|${VITE_API_BASE_URL}|g" \
-    -e "s|__VITE_WS_BASE_URL__|${VITE_WS_BASE_URL}|g" \
     -e "s|__VITE_APP_NAME__|${VITE_APP_NAME}|g" \
     -e "s|__VITE_APP_VERSION__|${VITE_APP_VERSION}|g" \
     {} \;

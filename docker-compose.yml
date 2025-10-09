@@ -1,0 +1,104 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: gyz-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gyz}
+      POSTGRES_USER: ${POSTGRES_USER:-gyz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gyz123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gyz} -d ${POSTGRES_DB:-gyz}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: gyz-redis
+    command: ["redis-server", "--save", "900", "1", "--loglevel", "warning"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  ai:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+      args:
+        - HTTP_PROXY=http://192.168.5.2:7897
+        - HTTPS_PROXY=http://192.168.5.2:7897
+    container_name: gyz-ai
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./ai/model:/app/model:ro
+    ports:
+      - "8002:8002"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8002/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: gyz-backend
+    environment:
+      - RUST_LOG=info
+      - DATABASE_URL=postgres://${POSTGRES_USER:-gyz}:${POSTGRES_PASSWORD:-gyz123}@postgres:5432/${POSTGRES_DB:-gyz}
+      - REDIS_URL=redis://redis:6379
+      - AI_SERVICE_URL=http://ai:8002
+      - BIND_ADDRESS=0.0.0.0:8080
+      - CACHE_TTL_SECONDS=900
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
+        - VITE_API_BASE_URL=http://localhost:8080/api/v1
+    container_name: gyz-frontend
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres_data:
+  redis_data:
