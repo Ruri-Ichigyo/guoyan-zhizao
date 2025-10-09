@@ -1,0 +1,104 @@
+image_path,predicted_label
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberries6.jpg,Lychee
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries7.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/tomatoes1.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apple.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries_wax4.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberry2.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/pears1.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberry.jpg,Strawberry Wedge
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberry4.jpg,Lychee
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries2.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/peaches.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apples1.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/strawberries.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cocos.jpg,Pineapple
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries_strawberries2.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/physalis1.jpg,Avocado
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apple_apricot_nectarine_peach_peach(flat)_pomegranate_pear_plum.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/pears2.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apples2.jpg,Avocado
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/Bananas(lady_finger)4.jpg,Tamarillo
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberries10.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/pomegranate.jpg,Pitahaya Red
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apple_apricot_peach_peach(flat)_pomegranate_pear_plum_3.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cactus fruits.jpg,Apple Red Yellow 2
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cocos_kiwi_orange_dates_salak_plum_tamarilo_maracuja2.jpg,Pineapple
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries(rainier)1.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries(rainier)2.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberries11.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries_wax7.jpg,Pitahaya Red
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/strawberries2.jpg,Apple Red Yellow 2
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberries1.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cocos_kiwi_orange_dates_salak_plum_tamarilo_maracuja3.jpg,Pineapple Mini
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/mangos1.jpg,Pepper Green
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries_wax1.jpg,Granadilla
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/grape_pear_mandarine.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/plums_pears.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries3.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries_wax2.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/Bananas(lady_finger)1.jpg,Cherry 1
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/pomegranate2.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apples4.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberry5.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/tomatoes2.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/kiwi.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherry_strawberries2.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/limes.jpg,Pepper Green
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries8.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apples_pears.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apples_peaches2.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/dates.jpg,Pineapple Mini
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherry2.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberries4.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/tomatoes3.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/tomatoes4.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/salak.jpg,Pineapple
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberry3.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/mangos3.jpg,Onion Red
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apples_peaches1.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberries5.jpg,Pitahaya Red
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries4.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherry3.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/kachi.jpg,Pepper Yellow
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/tomatoes5.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/pear.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/lychee.jpg,Strawberry
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/physalis2.jpg,Apple Red Yellow 2
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/Bananas(lady_finger)3.jpg,Tamarillo
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberries12.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/Bananas(lady_finger)2.jpg,Cherry 1
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries_strawberries1.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/strawberries4.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberries7.jpg,Pitahaya Red
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries_wax5.jpg,Apple Red Yellow 2
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/strawberries5.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/tangelo.jpg,Mangostan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/chestnut1.jpg,Pineapple
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apple_grape.jpg,Strawberry
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/salak2.jpg,Pineapple
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberries9.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/mangos2.jpg,Pineapple
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberries8.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries_wax6.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries6.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/mangos_bananas(lady_finger).jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apple_apricot_peach_peach(flat)_pomegranate_pear_plum_2.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberries3.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/strawberries3.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apple_apricot_peach_peach(flat)_pomegranate_pear_plum.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apples3.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apple_pear.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/apple_grape2.jpg,Strawberry
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/grape_pear_mandarine2.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberries2.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/huckleberry.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/Bananas(lady_finger)5.jpg,Tamarillo
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries_wax3.jpg,Rambutan
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/raspberry_apple.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cocos_kiwi_orange_dates_salak_plum_tamarilo_maracuja.jpg,Pineapple
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherries5.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/mango.jpg,Apple Red Yellow 2
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/cherry_strawberries.jpg,Watermelon
+/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits/chestnut3.jpg,Strawberry
