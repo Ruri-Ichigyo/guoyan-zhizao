@@ -133,22 +133,22 @@ cargo run --bin sort-svc
 
 ### Upload Service (3001)
 
-- `POST /api/upload` - 直接上传文件
-- `POST /api/presign` - 生成预签名 URL
+- `POST /api/v1/uploads` - 直接上传文件
+- `POST /api/v1/uploads/presign` - 生成预签名 URL
 - `GET /health` - 健康检查
 
 ### Query Service (3002)
 
-- `GET /api/result/{job_id}` - 获取检测结果
-- `GET /api/results` - 分页查询结果列表
+- `GET /api/v1/results/{job_id}` - 获取检测结果
+- `GET /api/v1/results` - 分页查询结果列表
 - `GET /ws/live` - WebSocket 实时推送
 - `GET /health` - 健康检查
 
 ### Sort Service (3003)
 
-- `POST /api/sort/command` - 发送分选命令
-- `GET /api/sort/status` - 获取分选状态
-- `PUT /api/sort/config` - 更新配置
+- `POST /api/v1/sort/command` - 发送分选命令
+- `GET /api/v1/sort/status` - 获取分选状态
+- `PUT /api/v1/sort/config` - 更新配置
 - `GET /health` - 健康检查
 
 ## 🔧 开发工具

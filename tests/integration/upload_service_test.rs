@@ -87,7 +87,7 @@ async fn test_file_upload_flow() {
 
     // 这里应该连接到实际的测试服务器
     // let response = client
-    //     .post("http://localhost:3001/api/upload")
+    //     .post("http://localhost:3001/api/v1/uploads")
     //     .multipart(form)
     //     .send()
     //     .await;
@@ -104,12 +104,12 @@ mod upload_service_tests {
     #[tokio::test]
     async fn test_upload_endpoint() {
         let app = Router::new()
-            .route("/api/upload", post(test_upload));
+            .route("/api/v1/uploads", post(test_upload));
 
         let server = TestServer::new(app).unwrap();
 
         let response = server
-            .post("/api/upload")
+            .post("/api/v1/uploads")
             .bytes(b"test file content")
             .await;
 
@@ -119,13 +119,13 @@ mod upload_service_tests {
     #[tokio::test]
     async fn test_invalid_file_upload() {
         let app = Router::new()
-            .route("/api/upload", post(test_upload));
+            .route("/api/v1/uploads", post(test_upload));
 
         let server = TestServer::new(app).unwrap();
 
         // 测试空文件上传
         let response = server
-            .post("/api/upload")
+            .post("/api/v1/uploads")
             .bytes(b"")
             .await;
 

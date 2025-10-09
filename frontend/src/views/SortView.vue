@@ -1173,7 +1173,7 @@ watch(sortingParams, (newParams) => {
 // Lifecycle
 onMounted(async () => {
   // Connect to WebSocket
-  await connect('ws://localhost:8080/ws/sort-control')
+  await connect('ws://localhost:8000/api/v1/ws/sort-control')
 
   // Setup message handlers
   onMessage('device_status', (data: any) => { // Explicitly type data as any

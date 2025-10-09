@@ -6,16 +6,17 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 import torch
+import torch.nn as nn
 import cv2
 import numpy as np
-from ultralytics import YOLO
+from torchvision import models
 from kafka import KafkaConsumer, KafkaProducer
 from kafka.errors import KafkaError
 import boto3
 from botocore.exceptions import ClientError
 
-from utils.preprocess import preprocess_image
-from utils.postprocess import postprocess_results, calculate_quality_grade
+from utils.preprocess import preprocess_image, DEFAULT_TRANSFORM
+from utils.postprocess import calculate_quality_grade
 
 # Configure logging
 logging.basicConfig(
@@ -27,10 +28,14 @@ logger = logging.getLogger(__name__)
 class FruitDetectionService:
     def __init__(self):
         self.model = None
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.transform = DEFAULT_TRANSFORM
         self.s3_client = None
         self.kafka_consumer = None
         self.kafka_producer = None
         self.labels = self._load_labels()
+        self.num_classes = len(self.labels)
+        self.top_k = min(3, self.num_classes) if self.num_classes else 0
 
         self._init_model()
         self._init_s3_client()
@@ -40,7 +45,9 @@ class FruitDetectionService:
         """Load class labels from JSON file."""
         try:
             with open('model/labels.json', 'r', encoding='utf-8') as f:
-                labels = json.load(f)
+                raw_labels = json.load(f)
+
+            labels = {int(k): v for k, v in raw_labels.items()}
             logger.info(f"Loaded {len(labels)} class labels")
             return labels
         except FileNotFoundError:
@@ -51,20 +58,34 @@ class FruitDetectionService:
             }
 
     def _init_model(self):
-        """Initialize YOLO model."""
+        """Initialize DenseNet model."""
         try:
-            model_path = 'model/yolov8n-fruit.pt'
-            if os.path.exists(model_path):
-                self.model = YOLO(model_path)
-                logger.info(f"Loaded custom model from {model_path}")
-            else:
-                self.model = YOLO('yolov8n.pt')  # Use pretrained model as fallback
-                logger.warning("Custom model not found, using pretrained YOLOv8n")
+            logger.info("Initializing DenseNet model for fruit classification")
+            base_model = models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1)
 
-            # Set device
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
-            self.model.to(device)
-            logger.info(f"Model loaded on device: {device}")
+            # Replace final classifier to match dataset classes
+            num_features = base_model.classifier.in_features
+            if self.num_classes == 0:
+                raise ValueError("No class labels available for model initialization")
+
+            base_model.classifier = nn.Linear(num_features, self.num_classes)
+
+            model_path = 'model/fruit_densenet_weights.pth'
+            if os.path.exists(model_path):
+                state_dict = torch.load(model_path, map_location=self.device)
+                base_model.load_state_dict(state_dict)
+                logger.info(f"Loaded DenseNet weights from {model_path}")
+            else:
+                logger.warning(
+                    "Custom DenseNet weights not found. Using ImageNet backbone with randomly "
+                    "initialized classifier; predictions may be unreliable."
+                )
+
+            base_model.to(self.device)
+            base_model.eval()
+
+            self.model = base_model
+            logger.info(f"Model loaded on device: {self.device}")
 
         except Exception as e:
             logger.error(f"Failed to initialize model: {e}")
@@ -132,46 +153,43 @@ class FruitDetectionService:
             return None
 
     def detect_fruits(self, image: np.ndarray) -> List[Dict]:
-        """Perform fruit detection on image."""
+        """Perform fruit classification on image."""
         try:
-            # Preprocess image
-            processed_image = preprocess_image(image)
+            if self.model is None or self.top_k == 0:
+                logger.error("Model is not initialized or labels are missing")
+                return []
 
-            # Run inference
-            results = self.model(processed_image, verbose=False)
+            # Preprocess image into tensor and move to device
+            processed_tensor = preprocess_image(image, self.transform).unsqueeze(0).to(self.device)
 
-            # Process results
+            with torch.no_grad():
+                logits = self.model(processed_tensor)
+                probabilities = torch.softmax(logits, dim=1)
+                top_probs, top_indices = probabilities.topk(self.top_k, dim=1)
+
             detections = []
-            for result in results:
-                if result.boxes is not None:
-                    boxes = result.boxes.xyxy.cpu().numpy()
-                    confidences = result.boxes.conf.cpu().numpy()
-                    classes = result.boxes.cls.cpu().numpy()
+            height, width = image.shape[:2]
 
-                    for i in range(len(boxes)):
-                        x1, y1, x2, y2 = boxes[i]
-                        confidence = float(confidences[i])
-                        class_id = int(classes[i])
+            for probability, class_index in zip(top_probs[0], top_indices[0]):
+                confidence = float(probability.item())
+                class_id = int(class_index.item())
+                class_name = self.labels.get(class_id, f"unknown_{class_id}")
 
-                        if confidence > 0.5:  # Confidence threshold
-                            class_name = self.labels.get(class_id, f"unknown_{class_id}")
+                # Use full image as region since DenseNet provides classification only
+                quality_grade = calculate_quality_grade(
+                    image,
+                    class_name,
+                    confidence
+                )
 
-                            # Calculate quality grade based on various factors
-                            quality_grade = calculate_quality_grade(
-                                image[int(y1):int(y2), int(x1):int(x2)],
-                                class_name,
-                                confidence
-                            )
+                detections.append({
+                    'class_name': class_name,
+                    'confidence': confidence,
+                    'bbox': [0.0, 0.0, float(width), float(height)],
+                    'quality_grade': quality_grade
+                })
 
-                            detection = {
-                                'class_name': class_name,
-                                'confidence': confidence,
-                                'bbox': [float(x1), float(y1), float(x2), float(y2)],
-                                'quality_grade': quality_grade
-                            }
-                            detections.append(detection)
-
-            logger.info(f"Detected {len(detections)} fruits")
+            logger.info(f"Generated top-{len(detections)} predictions")
             return detections
 
         except Exception as e:
@@ -189,8 +207,9 @@ class FruitDetectionService:
                 'total_fruits': len(detections),
                 'timestamp': datetime.utcnow().isoformat(),
                 'metadata': {
-                    'model_version': 'yolov8n-fruit-v1',
-                    'confidence_threshold': 0.5
+                    'model_version': 'densenet121-fruit-v1',
+                    'confidence_threshold': None,
+                    'top_k': self.top_k
                 }
             }
 

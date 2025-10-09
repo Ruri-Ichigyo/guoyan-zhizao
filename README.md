@@ -9,7 +9,7 @@
 - **后端**: Rust微服务 (Tokio + Axum)
 - **存储**: MinIO对象存储
 - **消息队列**: Apache Kafka
-- **AI推理**: Python + YOLOv8
+- **AI推理**: Python + DenseNet121
 - **前端**: Vue3 + TypeScript + Vite
 - **监控**: WebSocket实时通信
 
@@ -28,6 +28,9 @@ http://localhost:3000
 
 # API网关
 http://localhost:8000
+
+# 统一 API 前缀
+http://localhost:8000/api/v1
 ```
 
 ## 服务端口

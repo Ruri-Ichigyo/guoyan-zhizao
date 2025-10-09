@@ -4,6 +4,8 @@
 
 果蔬智能分拣系统采用微服务架构，提供完整的 RESTful API 和 WebSocket 接口，支持文件上传、AI 推理、结果查询和实时通信。
 
+> 当前 AI 推理服务基于 DenseNet121 分类器，并提供 Top-K 预测与质量评分结果。
+
 ### 服务架构
 
 - **上传服务 (Upload Service)**: 负责文件上传和预签名 URL 生成
@@ -15,13 +17,12 @@
 
 ## 基础信息
 
-果蔬智能分拣系统采用微服务架构，各服务运行在不同端口：
+果蔬智能分拣系统采用微服务架构，并通过 Kong 网关提供统一入口：
 
-- **上传服务**: `http://localhost:3001` (文件上传和预签名 URL)
-- **查询服务**: `http://localhost:3002` (结果查询和 WebSocket)
-- **分拣服务**: `http://localhost:3003` (分拣控制和状态)
-- **网关代理**: `http://localhost:8000` (Kong API 网关，统一入口)
-- **WebSocket URL**: `ws://localhost:3002/ws/live`
+- **统一入口 (Gateway)**: `http://localhost:8000/api/v1` (REST API)，`ws://localhost:8000/api/v1/ws/live` (WebSocket)
+- **上传服务**: `http://localhost:3001/api/v1/uploads` (文件上传和预签名 URL)
+- **查询服务**: `http://localhost:3002/api/v1/results` (结果查询和 WebSocket)
+- **分拣服务**: `http://localhost:3003/api/v1/sort` (分拣控制和状态)
 - **认证方式**: JWT Token
 - **Content-Type**: `application/json` (除文件上传外)
 
@@ -36,7 +37,7 @@ Authorization: Bearer <your-jwt-token>
 ### 获取 Token
 
 ```bash
-curl -X POST http://localhost:8000/auth/login \
+curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "your-username", "password": "your-password"}'
 ```
@@ -45,12 +46,12 @@ curl -X POST http://localhost:8000/auth/login \
 
 ### 1. 直接上传文件
 
-**POST** `/api/upload`
+**POST** `/api/v1/uploads`
 
 上传单个或多个图片文件进行 AI 分析。
 
 ```bash
-curl -X POST http://localhost:3001/api/upload \
+curl -X POST http://localhost:3001/api/v1/uploads \
   -H "Authorization: Bearer <token>" \
   -F "file=@/path/to/fruit.jpg"
 ```
@@ -67,12 +68,12 @@ curl -X POST http://localhost:3001/api/upload \
 
 ### 2. 获取预签名 URL
 
-**POST** `/api/presign`
+**POST** `/api/v1/uploads/presign`
 
 获取 MinIO 预签名 URL，用于直接上传到对象存储。
 
 ```bash
-curl -X POST http://localhost:3001/api/presign \
+curl -X POST http://localhost:3001/api/v1/uploads/presign \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -97,12 +98,12 @@ curl -X POST http://localhost:3001/api/presign \
 
 ### 1. 获取分析结果
 
-**GET** `/api/result/{job_id}`
+**GET** `/api/v1/results/{job_id}`
 
 获取特定任务的分析结果。
 
 ```bash
-curl -X GET http://localhost:3002/api/result/upload_12345 \
+curl -X GET http://localhost:3002/api/v1/results/upload_12345 \
   -H "Authorization: Bearer <token>"
 ````
 
@@ -132,7 +133,7 @@ curl -X GET http://localhost:3002/api/result/upload_12345 \
 
 ### 2. 获取结果列表
 
-**GET** `/api/results`
+**GET** `/api/v1/results`
 
 获取分页的结果列表。
 
@@ -145,7 +146,7 @@ curl -X GET http://localhost:3002/api/result/upload_12345 \
 - `to_date`: 结束日期 (ISO 8601)
 
 ```bash
-curl -X GET "http://localhost:3002/api/results?page=1&limit=20&status=completed" \
+curl -X GET "http://localhost:3002/api/v1/results?page=1&limit=20&status=completed" \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -177,12 +178,12 @@ curl -X GET "http://localhost:3002/api/results?page=1&limit=20&status=completed"
 
 ### 1. 发送分拣命令
 
-**POST** `/api/sort/command`
+**POST** `/api/v1/sort/command`
 
 控制分拣设备。
 
 ```bash
-curl -X POST http://localhost:3003/api/sort/command \
+curl -X POST http://localhost:3003/api/v1/sort/command \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -220,12 +221,12 @@ curl -X POST http://localhost:3003/api/sort/command \
 
 ### 2. 获取分拣状态
 
-**GET** `/api/sort/status`
+**GET** `/api/v1/sort/status`
 
 获取当前分拣设备状态。
 
 ```bash
-curl -X GET http://localhost:3003/api/sort/status \
+curl -X GET http://localhost:3003/api/v1/sort/status \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -244,12 +245,12 @@ curl -X GET http://localhost:3003/api/sort/status \
 
 ### 3. 更新分拣配置
 
-**PUT** `/api/sort/config`
+**PUT** `/api/v1/sort/config`
 
 更新分拣设备配置。
 
 ```bash
-curl -X PUT http://localhost:3003/api/sort/config \
+curl -X PUT http://localhost:3003/api/v1/sort/config \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -271,7 +272,7 @@ curl -X PUT http://localhost:3003/api/sort/config \
 连接到 WebSocket 获取实时更新。
 
 ```javascript
-const ws = new WebSocket("ws://localhost:3002/ws/live");
+const ws = new WebSocket("ws://localhost:8000/api/v1/ws/live");
 
 ws.onmessage = function (event) {
   const data = JSON.parse(event.data);
@@ -387,9 +388,7 @@ setInterval(() => {
 from guoyan_client import FruitSortClient
 
 client = FruitSortClient(
-    upload_url='http://localhost:3001',
-    query_url='http://localhost:3002',
-    sort_url='http://localhost:3003',
+    base_url='http://localhost:8000/api/v1',
     token='your-jwt-token'
 )
 
@@ -408,9 +407,7 @@ print(f"Detected fruits: {len(analysis['results'])}")
 import { FruitSortClient } from "@guoyan/client";
 
 const client = new FruitSortClient({
-  uploadURL: "http://localhost:3001",
-  queryURL: "http://localhost:3002",
-  sortURL: "http://localhost:3003",
+  baseURL: "http://localhost:8000/api/v1",
   token: "your-jwt-token",
 });
 
@@ -419,7 +416,7 @@ const result = await client.uploadFile(fileInput.files[0]);
 console.log(`Upload ID: ${result.upload_id}`);
 
 // WebSocket 连接
-const ws = client.connectWebSocket("ws://localhost:3002/ws/live");
+const ws = client.connectWebSocket("ws://localhost:8000/api/v1/ws/live");
 ws.on("detection_result", (data) => {
   console.log("New result:", data);
 });

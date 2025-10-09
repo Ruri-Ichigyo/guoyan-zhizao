@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = 'http://localhost:8000/api/v1'
 
 export interface DetectionResult {
   class_name: string
@@ -41,13 +41,13 @@ export interface QueryParams {
 export const resultApi = {
   // Get specific job result
   async getResult(jobId: string): Promise<JobResult> {
-    const response = await axios.get(`${API_BASE}/api/result/${jobId}`)
+    const response = await axios.get(`${API_BASE}/results/${jobId}`)
     return response.data
   },
 
   // Get paginated results
   async getResults(params: QueryParams = {}): Promise<PaginatedResults> {
-    const response = await axios.get(`${API_BASE}/api/results`, {
+    const response = await axios.get(`${API_BASE}/results`, {
       params
     })
     return response.data
@@ -55,7 +55,7 @@ export const resultApi = {
 
   // Get statistics
   async getStatistics(timeRange: string = '24h'): Promise<any> {
-    const response = await axios.get(`${API_BASE}/api/statistics`, {
+    const response = await axios.get(`${API_BASE}/statistics`, {
       params: { range: timeRange }
     })
     return response.data
@@ -63,7 +63,7 @@ export const resultApi = {
 
   // Export results
   async exportResults(format: string = 'csv', params: QueryParams = {}): Promise<Blob> {
-    const response = await axios.get(`${API_BASE}/api/results/export`, {
+    const response = await axios.get(`${API_BASE}/results/export`, {
       params: { ...params, format },
       responseType: 'blob'
     })
@@ -72,12 +72,12 @@ export const resultApi = {
 
   // Delete result
   async deleteResult(jobId: string): Promise<void> {
-    await axios.delete(`${API_BASE}/api/result/${jobId}`)
+    await axios.delete(`${API_BASE}/results/${jobId}`)
   },
 
   // Retry analysis
   async retryAnalysis(jobId: string): Promise<JobResult> {
-    const response = await axios.post(`${API_BASE}/api/result/${jobId}/retry`)
+    const response = await axios.post(`${API_BASE}/results/${jobId}/retry`)
     return response.data
   }
 }

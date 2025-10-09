@@ -1,16 +1,26 @@
 import os
+from pathlib import Path
 
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from PIL import Image
-from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader, Dataset
-import pandas as pd
+from torchvision import datasets, models, transforms
 
-# 数据集路径（根据你的实际路径设置）
-data_dir = '/kaggle/input/fruit-360/Fruit-Images-Dataset-master/Training'
-val_dir = '/kaggle/input/fruit-360/Fruit-Images-Dataset-master/test-multiple_fruits'
+# 数据集路径（可通过环境变量覆盖）
+BASE_DIR = Path(__file__).resolve().parent
+data_dir = os.environ.get(
+    'TRAIN_DATA_DIR',
+    str(BASE_DIR / 'Fruit-Images-Dataset-master' / 'Training')
+)
+val_dir = os.environ.get(
+    'VAL_DATA_DIR',
+    str(BASE_DIR / 'Fruit-Images-Dataset-master' / 'test-multiple_fruits')
+)
+output_dir = Path(os.environ.get('OUTPUT_DIR', BASE_DIR / 'model'))
+output_dir.mkdir(parents=True, exist_ok=True)
 
 # 数据预处理
 transform = transforms.Compose([
@@ -42,7 +52,8 @@ class UnlabeledImageDataset(Dataset):
 train_data = datasets.ImageFolder(root=data_dir, transform=transform)
 
 # DataLoader
-train_loader = DataLoader(train_data, batch_size=128, shuffle=True)
+batch_size = int(os.environ.get('BATCH_SIZE', 128))
+train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
 
 # 使用预训练的DenseNet模型
 model = models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1)  # 使用densenet121，可以根据需求替换为其他DenseNet模型
@@ -57,7 +68,8 @@ model = model.to(device)
 
 # 损失函数和优化器
 criterion = nn.CrossEntropyLoss()  # 多分类交叉熵损失函数
-optimizer = optim.Adam(model.parameters(), lr=0.001)  # Adam优化器
+learning_rate = float(os.environ.get('LEARNING_RATE', 0.001))
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)  # Adam优化器
 
 
 # 训练函数
@@ -128,9 +140,9 @@ def predict_images(model, data_loader, device, class_names):
 
 
 # 训练并验证
-epochs = 10
+epochs = int(os.environ.get('EPOCHS', 10))
 train(model, train_loader, criterion, optimizer, device, epochs)
-torch.save(model.state_dict(), "/kaggle/working/fruit_densenet_weights.pth")
+torch.save(model.state_dict(), output_dir / "fruit_densenet_weights.pth")
 # 获取类别名称列表（从训练集中）
 class_names = train_data.classes
 
@@ -144,5 +156,6 @@ results = predict_images(model, val_loader, device, class_names)
 
 
 df = pd.DataFrame(results)
-df.to_csv("/kaggle/working/predictions.csv", index=False)
-print("预测结果已保存到 /kaggle/working/predictions.csv")
+predictions_path = output_dir / "predictions.csv"
+df.to_csv(predictions_path, index=False)
+print(f"预测结果已保存到 {predictions_path}")

@@ -26,7 +26,7 @@ describe('E2E Tests for Fruit Sorting System', () => {
       cy.get('[data-cy=nav-upload]').click()
 
       // Mock slow upload
-      cy.intercept('POST', '/api/upload', {
+      cy.intercept('POST', '/api/v1/uploads', {
         delay: 2000,
         body: { upload_id: 'test-123', status: 'uploaded' }
       }).as('uploadFile')
@@ -46,7 +46,7 @@ describe('E2E Tests for Fruit Sorting System', () => {
       cy.get('[data-cy=nav-upload]').click()
 
       // Mock upload failure
-      cy.intercept('POST', '/api/upload', {
+      cy.intercept('POST', '/api/v1/uploads', {
         statusCode: 500,
         body: { error: 'Upload failed' }
       }).as('uploadFail')
@@ -93,7 +93,7 @@ describe('E2E Tests for Fruit Sorting System', () => {
   describe('Data Dashboard', () => {
     beforeEach(() => {
       // Mock statistics API
-      cy.intercept('GET', '/api/statistics*', {
+      cy.intercept('GET', '/api/v1/statistics*', {
         fixture: 'statistics-data.json'
       }).as('getStats')
     })
@@ -139,7 +139,7 @@ describe('E2E Tests for Fruit Sorting System', () => {
   describe('Results View', () => {
     beforeEach(() => {
       // Mock results API
-      cy.intercept('GET', '/api/results*', {
+      cy.intercept('GET', '/api/v1/results*', {
         fixture: 'results-data.json'
       }).as('getResults')
     })
@@ -189,7 +189,7 @@ describe('E2E Tests for Fruit Sorting System', () => {
       cy.wait('@getResults')
 
       // Mock export API
-      cy.intercept('GET', '/api/results/export*', {
+      cy.intercept('GET', '/api/v1/results/export*', {
         headers: { 'content-disposition': 'attachment; filename=results.csv' },
         body: 'id,status,created_at\\ntest-1,completed,2023-12-01'
       }).as('exportResults')
@@ -206,11 +206,11 @@ describe('E2E Tests for Fruit Sorting System', () => {
   describe('Sort Control', () => {
     beforeEach(() => {
       // Mock sort API
-      cy.intercept('POST', '/api/sort/command', {
+      cy.intercept('POST', '/api/v1/sort/command', {
         body: { success: true, message: '操作成功' }
       }).as('sortCommand')
 
-      cy.intercept('GET', '/api/sort/status', {
+      cy.intercept('GET', '/api/v1/sort/status', {
         fixture: 'sort-status.json'
       }).as('getSortStatus')
     })
@@ -318,11 +318,11 @@ describe('E2E Tests for Fruit Sorting System', () => {
   describe('System Integration', () => {
     it('should handle complete upload to result flow', () => {
       // Mock APIs
-      cy.intercept('POST', '/api/upload', {
+      cy.intercept('POST', '/api/v1/uploads', {
         body: { upload_id: 'integration-test-123', status: 'uploaded' }
       }).as('upload')
 
-      cy.intercept('GET', '/api/result/integration-test-123', {
+      cy.intercept('GET', '/api/v1/results/integration-test-123', {
         body: {
           job_id: 'integration-test-123',
           status: 'completed',
@@ -358,7 +358,7 @@ describe('E2E Tests for Fruit Sorting System', () => {
 
     it('should handle error scenarios gracefully', () => {
       // Test network errors
-      cy.intercept('POST', '/api/upload', { forceNetworkError: true }).as('networkError')
+      cy.intercept('POST', '/api/v1/uploads', { forceNetworkError: true }).as('networkError')
 
       cy.get('[data-cy=nav-upload]').click()
       cy.get('[data-cy=file-upload]').selectFile('cypress/fixtures/test-apple.jpg')
@@ -370,7 +370,7 @@ describe('E2E Tests for Fruit Sorting System', () => {
       cy.get('[data-cy=retry-button]').should('be.visible')
 
       // Test retry functionality
-      cy.intercept('POST', '/api/upload', {
+      cy.intercept('POST', '/api/v1/uploads', {
         body: { upload_id: 'retry-123', status: 'uploaded' }
       }).as('retryUpload')
 
@@ -387,7 +387,7 @@ describe('E2E Tests for Fruit Sorting System', () => {
       cy.get('[data-cy=nav-upload]').click()
 
       // Mock multiple uploads
-      cy.intercept('POST', '/api/upload', (req) => {
+      cy.intercept('POST', '/api/v1/uploads', (req) => {
         req.reply({
           delay: Math.random() * 1000, // Random delay 0-1s
           body: {
@@ -422,7 +422,7 @@ describe('E2E Tests for Fruit Sorting System', () => {
         created_at: new Date(Date.now() - i * 60000).toISOString()
       }))
 
-      cy.intercept('GET', '/api/results*', {
+      cy.intercept('GET', '/api/v1/results*', {
         body: {
           data: largeDataset.slice(0, 50), // First page
           pagination: {

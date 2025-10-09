@@ -1,8 +1,9 @@
 import pytest
-import asyncio
 import tempfile
 import numpy as np
-from unittest.mock import Mock, patch, AsyncMock
+import torch
+import cv2
+from unittest.mock import Mock, patch
 from PIL import Image
 import io
 
@@ -21,11 +22,22 @@ class TestFruitDetectionService:
     @pytest.fixture
     def service(self):
         """创建测试服务实例"""
-        with patch('main.YOLO'), \
+        mock_model = Mock()
+        mock_classifier = Mock()
+        mock_classifier.in_features = 1024
+        mock_model.classifier = mock_classifier
+        mock_model.to.return_value = mock_model
+        mock_model.eval.return_value = mock_model
+        mock_model.load_state_dict.return_value = None
+
+        with patch('main.models.densenet121', return_value=mock_model), \
              patch('main.boto3.client'), \
              patch('main.KafkaConsumer'), \
              patch('main.KafkaProducer'):
-            return FruitDetectionService()
+            service_instance = FruitDetectionService()
+            mock_logits = torch.randn(1, service_instance.num_classes)
+            service_instance.model.return_value = mock_logits
+            return service_instance
 
     @pytest.fixture
     def test_image(self):
@@ -50,9 +62,10 @@ class TestFruitDetectionService:
         """测试图像预处理"""
         processed = preprocess_image(test_image)
 
-        assert processed.shape == (640, 640, 3)
-        assert processed.dtype == np.float32
-        assert 0 <= processed.min() <= processed.max() <= 1
+        assert isinstance(processed, torch.Tensor)
+        assert processed.shape == (3, 224, 224)
+        assert processed.dtype == torch.float32
+        assert torch.isfinite(processed).all()
 
     def test_letterbox_resize(self, test_image):
         """测试 letterbox 调整"""
@@ -162,20 +175,18 @@ class TestFruitDetectionService:
 
     def test_detect_fruits_with_mock_model(self, service, test_image):
         """测试果蔬检测（使用模拟模型）"""
-        # 模拟 YOLO 模型返回
-        mock_result = Mock()
-        mock_result.boxes = Mock()
-        mock_result.boxes.xyxy.cpu().numpy.return_value = np.array([[10, 20, 100, 150]])
-        mock_result.boxes.conf.cpu().numpy.return_value = np.array([0.95])
-        mock_result.boxes.cls.cpu().numpy.return_value = np.array([0])
+        logits = torch.tensor([[3.0, 1.5, 0.2]], dtype=torch.float32)
+        service.labels = {0: '苹果', 1: '香蕉', 2: '橙子'}
+        service.num_classes = len(service.labels)
+        service.top_k = min(3, service.num_classes)
 
-        with patch.object(service.model, '__call__', return_value=[mock_result]):
+        with patch.object(service.model, '__call__', return_value=logits):
             detections = service.detect_fruits(test_image)
 
-            assert len(detections) == 1
-            assert detections[0]['class_name'] in service.labels.values()
-            assert detections[0]['confidence'] == 0.95
-            assert len(detections[0]['bbox']) == 4
+            assert len(detections) == service.top_k
+            assert detections[0]['class_name'] == '苹果'
+            assert detections[0]['confidence'] > detections[1]['confidence']
+            assert detections[0]['bbox'] == [0.0, 0.0, float(test_image.shape[1]), float(test_image.shape[0])]
 
     @pytest.mark.asyncio
     async def test_s3_download(self, service):
@@ -205,16 +216,15 @@ class TestFruitDetectionService:
 
     def test_kafka_message_sending(self, service):
         """测试 Kafka 消息发送"""
-        mock_future = AsyncMock()
+        mock_future = Mock()
         mock_future.get.return_value = None
 
         with patch.object(service.kafka_producer, 'send', return_value=mock_future):
-            # 这里需要使用 asyncio.run 因为方法是 async
-            asyncio.run(service.send_result_to_kafka(
+            service.send_result_to_kafka(
                 'test-upload-123',
                 [{'class_name': '苹果', 'confidence': 0.9}],
                 'completed'
-            ))
+            )
 
             # 验证 Kafka 发送被调用
             service.kafka_producer.send.assert_called_once()

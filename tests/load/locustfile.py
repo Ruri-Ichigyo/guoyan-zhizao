@@ -36,7 +36,7 @@ class FruitSortingUser(FastHttpUser):
         }
 
         with self.client.post(
-            "/api/upload",
+            "/api/v1/uploads",
             files=files,
             catch_response=True,
             name="Upload Image"
@@ -65,7 +65,7 @@ class FruitSortingUser(FastHttpUser):
         upload_id = random.choice(self.upload_ids)
 
         with self.client.get(
-            f"/api/result/{upload_id}",
+            f"/api/v1/results/{upload_id}",
             catch_response=True,
             name="Get Result"
         ) as response:
@@ -94,7 +94,7 @@ class FruitSortingUser(FastHttpUser):
         params = {k: v for k, v in params.items() if v is not None}
 
         with self.client.get(
-            "/api/results",
+            "/api/v1/results",
             params=params,
             catch_response=True,
             name="List Results"
@@ -114,7 +114,7 @@ class FruitSortingUser(FastHttpUser):
         time_range = random.choice(["1h", "24h", "7d", "30d"])
 
         with self.client.get(
-            "/api/statistics",
+            "/api/v1/statistics",
             params={"range": time_range},
             catch_response=True,
             name="Get Statistics"
@@ -144,7 +144,7 @@ class FruitSortingUser(FastHttpUser):
         }
 
         with self.client.post(
-            "/api/sort/command",
+            "/api/v1/sort/command",
             json=payload,
             catch_response=True,
             name=f"Sort Control - {action.title()}"
@@ -162,7 +162,7 @@ class FruitSortingUser(FastHttpUser):
     def get_sort_status(self):
         """获取分拣状态"""
         with self.client.get(
-            "/api/sort/status",
+            "/api/v1/sort/status",
             catch_response=True,
             name="Get Sort Status"
         ) as response:
@@ -188,7 +188,7 @@ class FruitSortingUser(FastHttpUser):
         }
 
         with self.client.get(
-            "/api/results/export",
+            "/api/v1/results/export",
             params=params,
             catch_response=True,
             name=f"Export Results - {export_format.upper()}"
@@ -216,7 +216,7 @@ class FruitSortingUser(FastHttpUser):
 
         # 获取预签名URL
         with self.client.post(
-            "/api/presign",
+            "/api/v1/uploads/presign",
             json={
                 "filename": filename,
                 "content_type": "image/jpeg"

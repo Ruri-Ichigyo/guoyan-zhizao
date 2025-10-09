@@ -12,9 +12,9 @@
 //!
 //! ## API 接口
 //!
-//! - `GET /api/result/:job_id` - 获取指定任务的检测结果
-//! - `GET /api/results` - 获取检测结果列表（支持分页）
-//! - `GET /ws/live` - WebSocket实时数据推送
+//! - `GET /api/v1/results/:job_id` - 获取指定任务的检测结果
+//! - `GET /api/v1/results` - 获取检测结果列表（支持分页）
+//! - `GET /api/v1/ws/live` - WebSocket实时数据推送
 //! - `GET /health` - 健康检查
 
 use axum::{
@@ -61,9 +61,9 @@ async fn main() -> anyhow::Result<()> {
     let app_state = Arc::new(AppState { tx });
 
     let app = Router::new()
-        .route("/api/result/:job_id", get(routes::get_result))
-        .route("/api/results", get(routes::list_results))
-        .route("/ws/live", get(ws::websocket_handler))
+        .route("/api/v1/results/:job_id", get(routes::get_result))
+        .route("/api/v1/results", get(routes::list_results))
+        .route("/api/v1/ws/live", get(ws::websocket_handler))
         .route("/health", get(health_check))
         .layer(CorsLayer::permissive())
         .with_state(app_state);

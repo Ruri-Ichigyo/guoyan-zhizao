@@ -1,28 +1,49 @@
 import cv2
 import numpy as np
-from typing import Tuple
+import torch
+from PIL import Image
+from torchvision import transforms
+from typing import Optional, Tuple
 
-def preprocess_image(image: np.ndarray, target_size: Tuple[int, int] = (640, 640)) -> np.ndarray:
+# Default preprocessing pipeline for DenseNet-style models
+DEFAULT_TRANSFORM = transforms.Compose([
+    transforms.Resize((224, 224)),  # Resize to DenseNet input resolution
+    transforms.ToTensor(),          # Convert to tensor and scale to [0, 1]
+    transforms.Normalize(           # Apply ImageNet normalization
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
+    ),
+])
+
+def preprocess_image(
+    image: np.ndarray,
+    transform: Optional[transforms.Compose] = None
+) -> torch.Tensor:
     """
-    Preprocess image for YOLO inference.
+    Preprocess an image for DenseNet inference.
 
     Args:
-        image: Input image in BGR format
-        target_size: Target size for model input
+        image: Input image in BGR format.
+        transform: Optional torchvision transform pipeline. When None, uses
+            DEFAULT_TRANSFORM.
 
     Returns:
-        Preprocessed image
+        A normalized tensor ready for model inference.
     """
-    # Convert BGR to RGB
+    if image is None or image.size == 0:
+        raise ValueError("Input image is empty.")
+
+    if transform is None:
+        transform = DEFAULT_TRANSFORM
+
+    # Convert BGR numpy array to PIL Image in RGB color space
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    pil_image = Image.fromarray(rgb_image)
 
-    # Resize image while maintaining aspect ratio
-    resized_image = letterbox(rgb_image, target_size)
+    # Apply transformation pipeline
+    tensor = transform(pil_image)
 
-    # Normalize pixel values
-    normalized_image = resized_image.astype(np.float32) / 255.0
-
-    return normalized_image
+    return tensor
 
 def letterbox(image: np.ndarray, new_shape: Tuple[int, int], color=(114, 114, 114)) -> np.ndarray:
     """

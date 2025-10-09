@@ -113,20 +113,20 @@ AI服务监听 → 下载图片 → 执行检测 → 保存结果 → 通知完�
 ## 🔌 API 接口设计
 
 ### Upload Service API
-- `POST /api/upload` - 直接文件上传
-- `POST /api/presign` - 生成预签名URL
+- `POST /api/v1/uploads` - 直接文件上传
+- `POST /api/v1/uploads/presign` - 生成预签名URL
 - `GET /health` - 健康检查
 
 ### Query Service API  
-- `GET /api/result/{job_id}` - 获取检测结果
-- `GET /api/results` - 分页查询结果列表
+- `GET /api/v1/results/{job_id}` - 获取检测结果
+- `GET /api/v1/results` - 分页查询结果列表
 - `GET /ws/live` - WebSocket实时推送
 - `GET /health` - 健康检查
 
 ### Sort Service API
-- `POST /api/sort/command` - 发送分选命令  
-- `GET /api/sort/status` - 获取分选状态
-- `PUT /api/sort/config` - 更新分选配置
+- `POST /api/v1/sort/command` - 发送分选命令  
+- `GET /api/v1/sort/status` - 获取分选状态
+- `PUT /api/v1/sort/config` - 更新分选配置
 - `GET /health` - 健康检查
 
 ## 🔄 事件驱动架构

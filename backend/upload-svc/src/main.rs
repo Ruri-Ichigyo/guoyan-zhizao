@@ -12,8 +12,8 @@
 //!
 //! ## API 接口
 //!
-//! - `POST /api/upload` - 直接上传文件
-//! - `POST /api/presign` - 生成预签名URL
+//! - `POST /api/v1/uploads` - 直接上传文件
+//! - `POST /api/v1/uploads/presign` - 生成预签名URL
 //! - `GET /health` - 健康检查
 
 use axum::{
@@ -63,8 +63,8 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let app = Router::new()
-        .route("/api/upload", post(routes::handle_upload))
-        .route("/api/presign", post(routes::handle_presign))
+        .route("/api/v1/uploads", post(routes::handle_upload))
+        .route("/api/v1/uploads/presign", post(routes::handle_presign))
         .route("/health", get(health_check))
         .layer(CorsLayer::permissive());
 

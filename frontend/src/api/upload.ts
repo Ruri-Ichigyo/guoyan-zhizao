@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = 'http://localhost:8000/api/v1'
 
 export interface UploadResponse {
   upload_id: string
@@ -19,7 +19,7 @@ export const uploadApi = {
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await axios.post(`${API_BASE}/api/upload`, formData, {
+    const response = await axios.post(`${API_BASE}/uploads`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -36,7 +36,7 @@ export const uploadApi = {
 
   // Get presigned URL for direct upload to MinIO
   async getPresignedUrl(request: PresignRequest): Promise<UploadResponse> {
-    const response = await axios.post(`${API_BASE}/api/presign`, request)
+    const response = await axios.post(`${API_BASE}/uploads/presign`, request)
     return response.data
   },
 
@@ -72,7 +72,7 @@ export const uploadApi = {
       formData.append('total_chunks', totalChunks.toString())
       formData.append('filename', file.name)
 
-      await axios.post(`${API_BASE}/api/upload/chunk`, formData, {
+      await axios.post(`${API_BASE}/uploads/chunk`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         }
@@ -80,7 +80,7 @@ export const uploadApi = {
     }
 
     // Complete multipart upload
-    const response = await axios.post(`${API_BASE}/api/upload/complete`, {
+    const response = await axios.post(`${API_BASE}/uploads/complete`, {
       upload_id: uploadId,
       filename: file.name
     })

@@ -6,8 +6,12 @@ services:
     url: http://upload-svc:3001
     routes:
       - name: upload-route
-        paths: ["/api/upload"]
-        methods: ["POST", "GET"]
+        paths:
+          - "/api/v1/uploads"
+          - "/api/v1/uploads/presign"
+          - "/api/v1/uploads/chunk"
+          - "/api/v1/uploads/complete"
+        methods: ["POST", "GET", "OPTIONS"]
         plugins:
           - name: jwt
           - name: rate-limiting
@@ -19,8 +23,10 @@ services:
     url: http://query-svc:3002
     routes:
       - name: query-route
-        paths: ["/api/result", "/ws"]
-        methods: ["GET", "POST"]
+        paths:
+          - "/api/v1/results"
+          - "/api/v1/ws"
+        methods: ["GET", "POST", "DELETE", "OPTIONS"]
         plugins:
           - name: jwt
           - name: rate-limiting
@@ -32,8 +38,8 @@ services:
     url: http://sort-svc:3003
     routes:
       - name: sort-route
-        paths: ["/api/sort"]
-        methods: ["POST", "PUT"]
+        paths: ["/api/v1/sort"]
+        methods: ["GET", "POST", "PUT", "OPTIONS"]
         plugins:
           - name: jwt
           - name: rate-limiting

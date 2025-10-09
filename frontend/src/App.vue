@@ -73,10 +73,10 @@
     <el-dialog v-model="showSettings" title="系统设置" width="600px">
       <el-form label-width="120px">
         <el-form-item label="API端点">
-          <el-input v-model="settings.apiEndpoint" placeholder="http://localhost:8000" />
+          <el-input v-model="settings.apiEndpoint" placeholder="http://localhost:8000/api/v1" />
         </el-form-item>
         <el-form-item label="WebSocket端点">
-          <el-input v-model="settings.wsEndpoint" placeholder="ws://localhost:8000/ws/live" />
+          <el-input v-model="settings.wsEndpoint" placeholder="ws://localhost:8000/api/v1/ws/live" />
         </el-form-item>
         <el-form-item label="自动刷新间隔">
           <el-select v-model="settings.refreshInterval">
@@ -118,8 +118,8 @@ const wsError = ref<string | null>(null) // New: To store WebSocket connection e
 const liveJobsCount = ref(0)
 
 const settings = ref({
-  apiEndpoint: 'http://localhost:8000',
-  wsEndpoint: 'ws://localhost:8000/ws/live',
+  apiEndpoint: 'http://localhost:8000/api/v1',
+  wsEndpoint: 'ws://localhost:8000/api/v1/ws/live',
   refreshInterval: 10000
 })
 

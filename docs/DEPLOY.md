@@ -67,7 +67,7 @@ KAFKA_BOOTSTRAP_SERVERS=kafka:9092
 JWT_SECRET=your-256-bit-secret-key-change-in-production
 
 # AI 服务配置
-MODEL_PATH=/app/model/yolov8n-fruit.pt
+MODEL_PATH=/app/model/fruit_densenet_weights.pth
 INFERENCE_BATCH_SIZE=4
 CONFIDENCE_THRESHOLD=0.5
 
@@ -516,7 +516,7 @@ server {
         proxy_cache_bypass $http_upgrade;
     }
 
-    location /api/ {
+    location /api/v1/ {
         proxy_pass http://localhost:8000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -525,7 +525,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    location /ws/ {
+    location /api/v1/ws/ {
         proxy_pass http://localhost:8000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -772,10 +772,10 @@ kubectl get events --sort-by=.metadata.creationTimestamp
 
 ```bash
 # 使用 hey 进行压力测试
-hey -n 1000 -c 50 http://your-domain.com/api/upload
+hey -n 1000 -c 50 http://your-domain.com/api/v1/uploads
 
 # 分析响应时间分布
-curl -w "@curl-format.txt" -o /dev/null http://your-domain.com/api/result/test
+curl -w "@curl-format.txt" -o /dev/null http://your-domain.com/api/v1/results/test
 ```
 
 ## 更新和维护

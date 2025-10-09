@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-import cv2
+import torch
 from unittest.mock import Mock, patch
 
 import sys
@@ -15,11 +15,22 @@ class TestFruitDetectionService:
 
     @pytest.fixture
     def service(self):
-        with patch('main.YOLO'), \
+        mock_model = Mock()
+        mock_classifier = Mock()
+        mock_classifier.in_features = 1024
+        mock_model.classifier = mock_classifier
+        mock_model.to.return_value = mock_model
+        mock_model.eval.return_value = mock_model
+        mock_model.load_state_dict.return_value = None
+
+        with patch('main.models.densenet121', return_value=mock_model), \
              patch('main.boto3.client'), \
              patch('main.KafkaConsumer'), \
              patch('main.KafkaProducer'):
-            return FruitDetectionService()
+            service_instance = FruitDetectionService()
+            mock_logits = torch.randn(1, service_instance.num_classes)
+            service_instance.model.return_value = mock_logits
+            return service_instance
 
     def test_load_labels(self, service):
         """Test label loading."""
@@ -35,9 +46,10 @@ class TestFruitDetectionService:
         processed = preprocess_image(test_image)
 
         # Check output properties
-        assert processed.shape == (640, 640, 3)
-        assert processed.dtype == np.float32
-        assert 0 <= processed.min() <= processed.max() <= 1
+        assert isinstance(processed, torch.Tensor)
+        assert processed.shape == (3, 224, 224)
+        assert processed.dtype == torch.float32
+        assert torch.isfinite(processed).all()
 
     def test_letterbox_resize(self):
         """Test letterbox resizing."""

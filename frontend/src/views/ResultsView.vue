@@ -696,7 +696,7 @@ const loadResults = async () => {
       confidence,
       defects,
       processingTime: Math.floor(Math.random() * 200) + 50,
-      imageUrl: `/api/images/result_${i}.jpg`,
+      imageUrl: `/api/v1/images/result_${i}.jpg`,
       detectedAt: detectedAt.toISOString(),
       metadata: {
         '尺寸': `${Math.floor(Math.random() * 50 + 30)}mm`,

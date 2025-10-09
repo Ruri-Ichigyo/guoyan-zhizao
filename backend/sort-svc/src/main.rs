@@ -12,9 +12,9 @@
 //!
 //! ## API 接口
 //!
-//! - `POST /api/sort/command` - 发送分选命令
-//! - `GET /api/sort/status` - 获取分选状态
-//! - `PUT /api/sort/config` - 更新分选配置
+//! - `POST /api/v1/sort/command` - 发送分选命令
+//! - `GET /api/v1/sort/status` - 获取分选状态
+//! - `PUT /api/v1/sort/config` - 更新分选配置
 //! - `GET /health` - 健康检查
 
 use axum::{
@@ -81,9 +81,9 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let app = Router::new()
-        .route("/api/sort/command", post(handle_sort_command))
-        .route("/api/sort/status", get(get_sort_status))
-        .route("/api/sort/config", put(update_sort_config))
+        .route("/api/v1/sort/command", post(handle_sort_command))
+        .route("/api/v1/sort/status", get(get_sort_status))
+        .route("/api/v1/sort/config", put(update_sort_config))
         .route("/health", get(health_check))
         .layer(CorsLayer::permissive());
 

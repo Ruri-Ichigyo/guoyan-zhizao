@@ -85,8 +85,8 @@ server {
     }
 
     # API proxy (optional - for development/testing)
-    location /api/ {
-        proxy_pass http://backend:8080/api/;
+    location /api/v1/ {
+        proxy_pass http://backend:8080/api/v1/;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -97,8 +97,8 @@ server {
     }
 
     # WebSocket proxy (optional - for development/testing)
-    location /ws/ {
-        proxy_pass http://backend:8080/ws/;
+    location /api/v1/ws/ {
+        proxy_pass http://backend:8080/api/v1/ws/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";

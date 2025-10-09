@@ -297,7 +297,7 @@ spec:
           # Create routes
           curl -X POST http://kong-service:8001/services/upload-service/routes \
             -d "name=upload-route" \
-            -d "paths[]=/api/v1/upload"
+            -d "paths[]=/api/v1/uploads"
 
           curl -X POST http://kong-service:8001/services/ai-inference-service/routes \
             -d "name=inference-route" \
@@ -305,7 +305,7 @@ spec:
 
           curl -X POST http://kong-service:8001/services/query-service/routes \
             -d "name=query-route" \
-            -d "paths[]=/api/v1/query"
+            -d "paths[]=/api/v1/results"
 
           curl -X POST http://kong-service:8001/services/sort-service/routes \
             -d "name=sort-route" \

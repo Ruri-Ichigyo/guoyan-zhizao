@@ -424,7 +424,7 @@ export function useJobWebSocket() {
   const { state, connect, disconnect, send, onMessage, offMessage } = useWebSocket('job')
 
   const connectToJobService = async (): Promise<void> => {
-    await connect('ws://localhost:8080/ws/job', {
+    await connect('ws://localhost:8000/api/v1/ws/job', {
       heartbeat: true,
       heartbeatInterval: 30000,
       reconnect: true,
@@ -472,7 +472,7 @@ export function useSystemWebSocket() {
   const { state, connect, disconnect, send, onMessage, offMessage } = useWebSocket('system')
 
   const connectToSystemService = async (): Promise<void> => {
-    await connect('ws://localhost:8080/ws/system', {
+    await connect('ws://localhost:8000/api/v1/ws/system', {
       heartbeat: true,
       heartbeatInterval: 15000,
       reconnect: true,
@@ -510,7 +510,7 @@ export function useCameraWebSocket() {
   const { state, connect, disconnect, send, onMessage, offMessage } = useWebSocket('camera')
 
   const connectToCameraService = async (): Promise<void> => {
-    await connect('ws://localhost:8080/ws/camera', {
+    await connect('ws://localhost:8000/api/v1/ws/camera', {
       heartbeat: true,
       heartbeatInterval: 10000,
       reconnect: true,

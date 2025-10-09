@@ -536,8 +536,8 @@ export const useJobStore = defineStore('job', () => {
       confidence,
       defects,
       processingTime: Math.floor(Math.random() * 200) + 50,
-      imageUrl: `/api/images/result_${job.results.length + 1}.jpg`,
-      thumbnailUrl: `/api/images/thumb_${job.results.length + 1}.jpg`,
+      imageUrl: `/api/v1/images/result_${job.results.length + 1}.jpg`,
+      thumbnailUrl: `/api/v1/images/thumb_${job.results.length + 1}.jpg`,
       detectedAt: new Date().toISOString(),
       metadata: {
         size: `${Math.floor(Math.random() * 50 + 30)}mm`,
