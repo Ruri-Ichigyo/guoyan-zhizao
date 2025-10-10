@@ -65,7 +65,8 @@ def calculate_quality_grade(fruit_region: np.ndarray, class_name: str, confidenc
 
         # Calculate various quality indicators
         color_uniformity = calculate_color_uniformity(hsv)
-        surface_quality = analyze_surface_defects(fruit_region)
+        defects = analyze_surface_defects(fruit_region)
+        surface_quality = _estimate_surface_quality(defects, fruit_region.shape[:2])
         size_score = calculate_size_score(fruit_region.shape[:2])
         freshness_score = analyze_freshness(lab)
 
@@ -127,7 +128,7 @@ def calculate_color_uniformity(hsv_image: np.ndarray) -> float:
     except Exception:
         return 0.5
 
-def analyze_surface_defects(image: np.ndarray) -> float:
+def analyze_surface_defects(image: np.ndarray) -> List[Dict[str, float]]:
     """
     Analyze surface quality and detect defects.
 
@@ -135,26 +136,58 @@ def analyze_surface_defects(image: np.ndarray) -> float:
         image: Fruit image region
 
     Returns:
-        Surface quality score (0-1)
+        List of detected defects with bounding boxes and severity scores.
     """
+    defects: List[Dict[str, float]] = []
+
     try:
-        # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-        # Apply Gaussian blur to reduce noise
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        edges = cv2.Canny(blurred, 40, 120)
 
-        # Edge detection to find surface irregularities
-        edges = cv2.Canny(blurred, 50, 150)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        dilated = cv2.dilate(edges, kernel, iterations=1)
+        contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # Calculate edge density
-        edge_density = np.sum(edges > 0) / edges.size
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            if area < 20:
+                continue
 
-        # Lower edge density indicates smoother surface
-        surface_score = max(0, 1 - edge_density * 5)
+            x, y, w, h = cv2.boundingRect(contour)
+            bbox_area = float(max(w * h, 1))
+            severity = float(np.clip(area / bbox_area, 0.0, 1.0))
 
-        return min(1.0, surface_score)
+            defects.append(
+                {
+                    "bbox": [int(x), int(y), int(w), int(h)],
+                    "area": float(area),
+                    "severity": severity,
+                }
+            )
 
+    except Exception:
+        return defects
+
+    defects.sort(key=lambda item: item["area"], reverse=True)
+    return defects
+
+
+def _estimate_surface_quality(defects: List[Dict[str, float]], shape: Tuple[int, int]) -> float:
+    """Convert defect detections into a normalized surface quality score."""
+    try:
+        height, width = shape
+        image_area = max(height * width, 1)
+
+        if not defects:
+            return 1.0
+
+        total_defect_area = sum(defect["area"] for defect in defects)
+        mean_severity = float(np.mean([defect["severity"] for defect in defects])) if defects else 0.0
+
+        coverage = float(np.clip(total_defect_area / image_area, 0.0, 1.0))
+        score = 1.0 - (coverage * 0.7 + mean_severity * 0.3)
+        return float(np.clip(score, 0.0, 1.0))
     except Exception:
         return 0.5
 

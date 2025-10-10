@@ -5,11 +5,18 @@
         <h1>果蔬智造核心平台</h1>
         <p class="subtitle">上传识别 · 智能分析 · 快速查询</p>
       </div>
-      <nav class="app-nav">
-        <RouterLink to="/">首页</RouterLink>
-        <RouterLink to="/upload">图像上传</RouterLink>
-        <RouterLink to="/results">检测结果</RouterLink>
-      </nav>
+      <div class="header-actions">
+        <nav class="app-nav" v-if="isAuthenticated">
+          <RouterLink to="/">首页</RouterLink>
+          <RouterLink v-if="canUpload" to="/upload">图像上传</RouterLink>
+          <RouterLink to="/results">检测结果</RouterLink>
+        </nav>
+        <div class="account" v-if="isAuthenticated">
+          <span class="account-name">{{ username }} · {{ roleLabel }}</span>
+          <el-button type="text" @click="logout">退出</el-button>
+        </div>
+        <el-button v-else type="primary" @click="goLogin">登录</el-button>
+      </div>
     </header>
 
     <main class="app-main">
@@ -23,7 +30,41 @@
 </template>
 
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
+import { computed } from 'vue'
+import { useRouter, RouterLink } from 'vue-router'
+import { ElMessage } from 'element-plus'
+
+import { useUserStore } from '@/stores/user'
+
+const router = useRouter()
+const store = useUserStore()
+
+const isAuthenticated = computed(() => store.isAuthenticated.value)
+const username = computed(() => store.user.value?.username ?? '未登录')
+const roleLabel = computed(() => {
+  const role = store.role.value
+  switch (role.toLowerCase()) {
+    case 'admin':
+      return '管理员'
+    case 'operator':
+      return '操作员'
+    case 'viewer':
+      return '观察者'
+    default:
+      return role || '未知角色'
+  }
+})
+const canUpload = computed(() => store.canUpload.value)
+
+const logout = () => {
+  store.clearAuth()
+  ElMessage.success('已退出登录')
+  router.push({ name: 'Login' })
+}
+
+const goLogin = () => {
+  router.push({ name: 'Login' })
+}
 </script>
 
 <style>
@@ -44,6 +85,12 @@ import { RouterLink } from 'vue-router'
   background: #1abc9c;
   color: #fff;
   box-shadow: 0 6px 16px rgba(26, 188, 156, 0.25);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
 }
 
 .app-header h1 {
@@ -78,6 +125,16 @@ import { RouterLink } from 'vue-router'
 
 .app-nav a.router-link-active {
   border-color: #fff;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.account-name {
+  font-size: 0.95rem;
 }
 
 .app-main {

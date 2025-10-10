@@ -7,7 +7,7 @@
             <h2 class="card-title">图像上传</h2>
             <p class="card-subtitle">上传果蔬图片并触发 AI 分析</p>
           </div>
-          <el-button type="primary" :loading="uploading" @click="openFileDialog">
+          <el-button type="primary" :loading="uploading" :disabled="!canUpload" @click="openFileDialog">
             <el-icon class="mr-1"><UploadFilled /></el-icon>
             选择图片
           </el-button>
@@ -20,6 +20,15 @@
           />
         </div>
       </template>
+
+      <el-alert
+        v-if="!canUpload"
+        title="当前账号没有上传权限"
+        type="warning"
+        description="请联系管理员开通上传或分析权限"
+        show-icon
+        class="mb-4"
+      />
 
       <div v-if="uploading" class="upload-state">
         <el-skeleton animated />
@@ -142,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 
@@ -150,6 +159,7 @@ import type { DetailedResult, ResultSummary } from '@/api/result'
 import { resultApi } from '@/api/result'
 import type { UploadResult } from '@/api/upload'
 import { uploadApi } from '@/api/upload'
+import { useUserStore } from '@/stores/user'
 
 const uploading = ref(false)
 const uploadError = ref<string | null>(null)
@@ -158,8 +168,14 @@ const recentResults = ref<ResultSummary[]>([])
 const detailVisible = ref(false)
 const dialogResult = ref<DetailedResult | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const userStore = useUserStore()
+const canUpload = computed(() => userStore.canUpload.value)
 
 const openFileDialog = () => {
+  if (!canUpload.value) {
+    ElMessage.warning('当前账号无权上传图片')
+    return
+  }
   fileInput.value?.click()
 }
 
@@ -174,6 +190,11 @@ const handleFileChange = async (event: Event) => {
   const file = input.files[0]
   if (!file.type.startsWith('image/')) {
     ElMessage.error('仅支持图片文件')
+    return
+  }
+
+  if (!canUpload.value) {
+    ElMessage.warning('当前账号无权上传图片')
     return
   }
 

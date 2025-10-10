@@ -7,6 +7,8 @@ pub async fn health(State(state): State<AppState>) -> Result<Json<serde_json::Va
     sqlx::query("SELECT 1").execute(&state.pool).await?;
 
     let mut conn = cache::get_connection(&state.redis).await?;
-    redis::cmd("PING").query_async::<_, String>(&mut conn).await?;
+    redis::cmd("PING")
+        .query_async::<_, String>(&mut conn)
+        .await?;
     Ok(Json(json!({ "status": "ok" })))
 }

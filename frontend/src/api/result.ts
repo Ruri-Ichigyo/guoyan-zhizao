@@ -1,6 +1,4 @@
-import axios from 'axios'
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1'
+import { http } from './http'
 
 export interface DetectionResult {
   class_name: string
@@ -48,17 +46,17 @@ export interface StatisticsResponse {
 
 export const resultApi = {
   async getResult(uploadId: string): Promise<DetailedResult> {
-    const response = await axios.get(`${API_BASE}/results/${uploadId}`)
+    const response = await http.get(`/results/${uploadId}`)
     return response.data
   },
 
   async getResults(params: QueryParams = {}): Promise<PaginatedResults> {
-    const response = await axios.get(`${API_BASE}/results`, { params })
+    const response = await http.get('/results', { params })
     return response.data
   },
 
   async getStatistics(): Promise<StatisticsResponse> {
-    const response = await axios.get(`${API_BASE}/statistics`)
+    const response = await http.get('/statistics')
     return response.data
   }
 }

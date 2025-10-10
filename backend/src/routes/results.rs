@@ -7,6 +7,7 @@ use sqlx::QueryBuilder;
 use uuid::Uuid;
 
 use crate::{
+    auth::{ensure_role, AuthUser, ROLE_ADMIN, ROLE_OPERATOR, ROLE_VIEWER},
     cache,
     errors::AppError,
     models::{
@@ -24,9 +25,12 @@ pub struct ListQuery {
 }
 
 pub async fn list_results(
+    user: AuthUser,
     State(state): State<AppState>,
     Query(query): Query<ListQuery>,
 ) -> Result<Json<PaginatedResults>, AppError> {
+    ensure_role(&user, &[ROLE_ADMIN, ROLE_OPERATOR, ROLE_VIEWER])?;
+
     let page = query.page.unwrap_or(1).max(1);
     let limit = query.limit.unwrap_or(10).clamp(1, 100);
     let offset = (page - 1) * limit;
@@ -96,9 +100,12 @@ pub async fn list_results(
 }
 
 pub async fn get_result(
+    user: AuthUser,
     State(state): State<AppState>,
     Path(result_id): Path<Uuid>,
 ) -> Result<Json<UploadResponsePayload>, AppError> {
+    ensure_role(&user, &[ROLE_ADMIN, ROLE_OPERATOR, ROLE_VIEWER])?;
+
     let cache_key = format!("result:{result_id}");
     if let Some(cached) = cache::get_cached_result(&state.redis, &cache_key)
         .await

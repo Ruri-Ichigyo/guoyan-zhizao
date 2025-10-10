@@ -20,6 +20,30 @@
       </el-col>
     </el-row>
 
+    <el-row v-if="statistics" :gutter="16" class="insight-row">
+      <el-col :span="12">
+        <el-card shadow="hover" class="insight-card">
+          <p class="insight-title">平均置信度</p>
+          <el-progress
+            :percentage="Math.round((statistics!.averages.avg_confidence ?? 0) * 100)"
+            :stroke-width="12"
+            status="success"
+          />
+        </el-card>
+      </el-col>
+      <el-col :span="12">
+        <el-card shadow="hover" class="insight-card">
+          <p class="insight-title">最近批次等级比例</p>
+          <div class="grade-distribution">
+            <div class="grade-item" v-for="item in gradeBreakdown" :key="item.label">
+              <span>{{ item.label }}</span>
+              <el-progress :percentage="item.percentage" :stroke-width="10" :status="item.status" />
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <el-card shadow="never">
       <template #header>
         <div class="table-header">
@@ -137,6 +161,36 @@ const statCards = computed(() => {
     { title: '已完成', value: totals.completed ?? 0 },
     { title: '处理中', value: totals.processing ?? 0 },
     { title: '识别总数', value: totals.total_fruits ?? 0 }
+  ]
+})
+
+const gradeBreakdown = computed(() => {
+  if (!results.value.length) {
+    return [
+      { label: 'A级', percentage: 0, status: 'success' },
+      { label: 'B级', percentage: 0, status: 'warning' },
+      { label: 'C级', percentage: 0, status: 'exception' }
+    ]
+  }
+
+  const aggregate = results.value.slice(0, 5).reduce(
+    (acc, item) => {
+      acc.total += item.total_fruits ?? 0
+      acc.a += item.grade_a ?? 0
+      acc.b += item.grade_b ?? 0
+      acc.c += item.grade_c ?? 0
+      return acc
+    },
+    { total: 0, a: 0, b: 0, c: 0 }
+  )
+
+  const { total, a, b, c } = aggregate
+  const safeDiv = (value: number) => (total > 0 ? Math.round((value / total) * 100) : 0)
+
+  return [
+    { label: `A级 (${a})`, percentage: safeDiv(a), status: 'success' },
+    { label: `B级 (${b})`, percentage: safeDiv(b), status: 'warning' },
+    { label: `C级 (${c})`, percentage: safeDiv(c), status: 'exception' }
   ]
 })
 
@@ -288,5 +342,37 @@ watch(
   color: #64748b;
   font-size: 0.9rem;
   margin: 0.25rem 0;
+}
+
+.insight-row {
+  margin-top: 1rem;
+}
+
+.insight-card {
+  border-radius: 14px;
+  min-height: 160px;
+}
+
+.insight-title {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.grade-distribution {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.grade-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.grade-item span {
+  width: 90px;
+  color: #475569;
 }
 </style>

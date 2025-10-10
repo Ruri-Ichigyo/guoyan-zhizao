@@ -55,6 +55,9 @@ cd backend
 export DATABASE_URL=postgres://gyz:gyz123@localhost:5432/gyz
 export REDIS_URL=redis://localhost:6379
 export AI_SERVICE_URL=http://localhost:8002
+# 可选：覆盖默认的 JWT 配置
+export JWT_SECRET=local-dev-secret
+export JWT_TTL_SECONDS=3600
 cargo run
 ```
 
@@ -74,8 +77,35 @@ npm run dev
 # 开发代理默认指向 http://localhost:8080
 ```
 
+### 3. 认证与默认账号
+
+后端启用了基于 JWT 的认证流程。服务启动时会在数据库中确保存在一个默认管理员账号，便于首次登录：
+
+- 默认用户名：`admin`
+- 默认密码：`admin123456`
+
+可通过以下环境变量覆盖默认值：
+
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `ADMIN_ROLE`（默认为 `admin`）
+- `JWT_SECRET`（默认 `development-secret-change-me`，生产环境务必修改）
+- `JWT_TTL_SECONDS`（默认 3600 秒）
+
+**获取访问令牌示例**
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123456"}'
+```
+
+登录成功后，响应会包含 `token` 和 `expires_at` 字段，后续请求需在 `Authorization` 头中携带 `Bearer <token>`。前端应用会在登录页中请求该接口并在本地保存会话信息。
+
 ## API 概要
 
+- `POST /api/v1/auth/login`：使用用户名与密码换取访问令牌
+- `GET /api/v1/auth/me`：校验令牌并返回当前用户信息
 - `POST /api/v1/uploads`：上传图片并返回检测结果
 - `GET /api/v1/results`：分页查询历史记录
 - `GET /api/v1/results/{id}`：获取单条检测详情
@@ -104,11 +134,3 @@ npm run dev
 - [API 参考](docs/API.md)：REST 接口定义与示例
 - [算法说明](docs/ALGORITHM.md)：模型训练与推理细节
 - [搭建核对](docs/SETUP_REPORT.md)：仓库结构与必备文件检查
-
-## 下一步
-
-- 为核心流程补充自动化测试
-- 根据实际模型替换 `ai/model` 中的权重与标签
-- 扩展前端展示与权限控制
-
-欢迎基于该精简架构继续迭代与集成。

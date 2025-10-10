@@ -7,6 +7,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::{
+    auth::{ensure_role, AuthUser, ROLE_ADMIN, ROLE_OPERATOR},
     cache, db,
     errors::AppError,
     models::{DetectionRecord, UploadResponsePayload},
@@ -16,9 +17,12 @@ use crate::{
 const MAX_UPLOAD_SIZE: usize = 10 * 1024 * 1024; // 10MB
 
 pub async fn upload_file(
+    user: AuthUser,
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<Json<UploadResponsePayload>, AppError> {
+    ensure_role(&user, &[ROLE_ADMIN, ROLE_OPERATOR])?;
+
     let mut file_name: Option<String> = None;
     let mut content_type: Option<String> = None;
     let mut file_bytes: Option<Vec<u8>> = None;

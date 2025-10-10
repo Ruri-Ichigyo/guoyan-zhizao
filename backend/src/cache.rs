@@ -6,7 +6,7 @@ pub fn init_client(redis_url: &str) -> anyhow::Result<Client> {
 }
 
 pub async fn get_connection(client: &Client) -> anyhow::Result<ConnectionManager> {
-    let connection = client.get_tokio_connection_manager().await?;
+    let connection = client.get_connection_manager().await?;
     Ok(connection)
 }
 
@@ -14,10 +14,10 @@ pub async fn cache_result(
     client: &Client,
     key: &str,
     value: &str,
-    ttl_seconds:u64,
+    ttl_seconds: u64,
 ) -> anyhow::Result<()> {
     let mut conn = get_connection(client).await?;
-    conn.set_ex(key, value, ttl_seconds).await?;
+    conn.set_ex::<_, _, ()>(key, value, ttl_seconds).await?;
     Ok(())
 }
 

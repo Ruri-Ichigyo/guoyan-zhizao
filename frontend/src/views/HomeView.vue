@@ -2,6 +2,7 @@
   <section class="home-hero">
     <div class="hero-intro">
       <h1>果蔬智造核心平台</h1>
+      <p class="welcome" v-if="welcomeMessage">{{ welcomeMessage }}</p>
       <p>
         轻量部署的果蔬检测方案：Rust 后端负责任务编排，FastAPI AI 服务完成识别分析，
         Redis 提供热点缓存，PostgreSQL 保存检测记录。
@@ -42,7 +43,19 @@
 import { useRouter } from 'vue-router'
 import { UploadFilled, List } from '@element-plus/icons-vue'
 
+import { computed } from 'vue'
+
+import { useUserStore } from '@/stores/user'
+
 const router = useRouter()
+const store = useUserStore()
+
+const welcomeMessage = computed(() => {
+  const username = store.user.value?.username
+  if (!username) return ''
+  const role = store.role.value
+  return `欢迎回来，${username}（${role}）`
+})
 
 const goTo = (path: string) => {
   router.push(path)
@@ -69,6 +82,12 @@ const goTo = (path: string) => {
   margin: 0 0 1rem;
   font-size: 2.4rem;
   font-weight: 700;
+}
+
+.welcome {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  opacity: 0.9;
 }
 
 .hero-intro p {

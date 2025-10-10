@@ -5,6 +5,13 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Serialize)]
+pub struct UserProfile {
+    pub user_id: Uuid,
+    pub username: String,
+    pub role: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetectionRecord {
     pub class_name: String,
@@ -22,7 +29,7 @@ pub struct AiInferenceResponse {
     pub timestamp: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UploadResponsePayload {
     pub upload_id: Uuid,
     pub filename: String,
@@ -120,4 +127,12 @@ pub struct DetailedRow {
     pub grade_b: Option<i32>,
     pub grade_c: Option<i32>,
     pub avg_confidence: Option<f32>,
+}
+
+#[derive(Debug, FromRow)]
+pub struct UserRecord {
+    pub id: Uuid,
+    pub username: String,
+    pub password_hash: String,
+    pub role: String,
 }

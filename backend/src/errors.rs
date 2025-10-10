@@ -14,6 +14,12 @@ pub enum AppError {
     #[error("resource not found")]
     NotFound,
 
+    #[error("unauthorized: {0}")]
+    Unauthorized(String),
+
+    #[error("forbidden: {0}")]
+    Forbidden(String),
+
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 
@@ -27,6 +33,12 @@ pub enum AppError {
     Unexpected(String),
 }
 
+impl From<anyhow::Error> for AppError {
+    fn from(err: anyhow::Error) -> Self {
+        AppError::Unexpected(err.to_string())
+    }
+}
+
 #[derive(Serialize)]
 struct ErrorResponse {
     message: String,
@@ -37,6 +49,8 @@ impl IntoResponse for AppError {
         let status = match self {
             AppError::Validation(_) => StatusCode::BAD_REQUEST,
             AppError::NotFound => StatusCode::NOT_FOUND,
+            AppError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            AppError::Forbidden(_) => StatusCode::FORBIDDEN,
             AppError::Database(_) | AppError::Cache(_) | AppError::HttpClient(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -48,5 +62,15 @@ impl IntoResponse for AppError {
         };
 
         (status, Json(payload)).into_response()
+    }
+}
+
+impl AppError {
+    pub fn unauthorized(message: impl Into<String>) -> Self {
+        AppError::Unauthorized(message.into())
+    }
+
+    pub fn forbidden(message: impl Into<String>) -> Self {
+        AppError::Forbidden(message.into())
     }
 }

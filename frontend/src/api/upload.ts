@@ -1,7 +1,5 @@
-import axios from 'axios'
 import type { DetectionResult } from './result'
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1'
+import { http } from './http'
 
 export interface UploadResult {
   upload_id: string
@@ -21,7 +19,7 @@ export const uploadApi = {
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await axios.post(`${API_BASE}/uploads`, formData, {
+    const response = await http.post('/uploads', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
 

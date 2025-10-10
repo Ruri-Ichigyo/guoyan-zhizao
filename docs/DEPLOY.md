@@ -21,6 +21,7 @@ git clone <repository-url>
 cd guoyan-zhizao
 cp .env.example .env
 # 根据需要调整数据库、缓存、端口等配置
+# 生产环境务必设置 JWT_SECRET、ADMIN_USERNAME、ADMIN_PASSWORD
 ```
 
 ### 2. 启动服务
@@ -40,6 +41,8 @@ cp .env.example .env
 docker compose ps
 docker compose logs -f backend
 ```
+
+首次启动后可使用在 `.env` 中配置的管理员账号访问 `http://<host>:3000/login`，或通过 `POST /api/v1/auth/login` 拉取访问令牌。
 
 ### 3. 备份与数据迁移
 
@@ -70,14 +73,6 @@ location /api/ {
 ## 安全加固建议
 
 1. 为 Docker 网络配置专用子网，限制外部访问数据库与 Redis。
-2. 修改 `.env` 中默认密码，并使用秘密管理服务托管敏感信息。
+2. 修改 `.env` 中默认密码、`JWT_SECRET` 等敏感配置，并使用秘密管理服务托管。
 3. 前端与后端之间启用 HTTPS，后端可添加鉴权逻辑。
 4. 定期更新镜像，关注依赖的安全公告。
-
-## 扩展方向
-
-- 对接对象存储以替代数据库二进制字段。
-- 引入消息队列缓冲高峰上传任务。
-- 增加多模型推理或分布式调度。
-
-如需更复杂的部署（Kubernetes、CI/CD 等），可在此基础上自行编排。

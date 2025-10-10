@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List
 
 import cv2
@@ -49,14 +50,37 @@ class FruitDetectionService:
         self.top_k = min(3, self.num_classes) if self.num_classes else 0
 
     def _load_labels(self) -> Dict[int, str]:
+        training_dir = Path(
+            os.getenv(
+                "TRAINING_DATA_DIR",
+                "Fruit-Images-Dataset-master/Training",
+            )
+        )
+
+        dataset_labels: Dict[int, str] = {}
+        if training_dir.exists() and training_dir.is_dir():
+            folder_names = sorted(
+                entry.name for entry in training_dir.iterdir() if entry.is_dir()
+            )
+            if folder_names:
+                dataset_labels = {index: name for index, name in enumerate(folder_names)}
+                self._persist_labels(dataset_labels)
+                logger.info(
+                    "Loaded %s class labels from training folder %s",
+                    len(dataset_labels),
+                    training_dir,
+                )
+                return dataset_labels
+            logger.warning("Training directory %s has no class folders", training_dir)
+
         try:
             with open("model/labels.json", "r", encoding="utf-8") as file:
                 raw_labels = json.load(file)
             labels = {int(k): v for k, v in raw_labels.items()}
-            logger.info("Loaded %s class labels", len(labels))
+            logger.info("Loaded %s class labels from labels.json", len(labels))
             return labels
         except FileNotFoundError:
-            logger.warning("Labels file not found, using default labels")
+            logger.warning("Labels file not found, using default fallback labels")
             return {
                 0: "apple",
                 1: "banana",
@@ -67,6 +91,15 @@ class FruitDetectionService:
                 6: "watermelon",
                 7: "peach",
             }
+
+    def _persist_labels(self, labels: Dict[int, str]) -> None:
+        try:
+            labels_path = Path("model/labels.json")
+            labels_path.parent.mkdir(parents=True, exist_ok=True)
+            with labels_path.open("w", encoding="utf-8") as file:
+                json.dump({str(k): v for k, v in labels.items()}, file, ensure_ascii=False, indent=2)
+        except OSError as exc:
+            logger.error("Failed to persist labels.json: %s", exc)
 
     def _load_model(self) -> torch.nn.Module:
         if self.num_classes == 0:
@@ -80,8 +113,14 @@ class FruitDetectionService:
         weights_path = "model/fruit_densenet_weights.pth"
         if os.path.exists(weights_path):
             state_dict = torch.load(weights_path, map_location=self.device)
-            model.load_state_dict(state_dict)
-            logger.info("Loaded custom weights from %s", weights_path)
+            # Load only the matching layers (feature extractor), skip classifier if shape mismatch
+            model_dict = model.state_dict()
+            filtered_dict = {k: v for k, v in state_dict.items()
+                           if k in model_dict and v.shape == model_dict[k].shape}
+            model_dict.update(filtered_dict)
+            model.load_state_dict(model_dict)
+            logger.info("Loaded custom weights from %s (%d/%d layers)",
+                       weights_path, len(filtered_dict), len(state_dict))
         else:
             logger.warning(
                 "Custom weights not found. Using pretrained backbone with random classifier"

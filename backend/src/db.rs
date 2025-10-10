@@ -1,5 +1,8 @@
 use chrono::Utc;
 use sqlx::{postgres::PgPoolOptions, PgPool};
+use uuid::Uuid;
+
+use crate::{auth, errors::AppError, models::UserRecord};
 
 const CREATE_UPLOADS_TABLE: &str = r#"
 CREATE TABLE IF NOT EXISTS uploads (
@@ -27,6 +30,16 @@ CREATE TABLE IF NOT EXISTS results (
 );
 "#;
 
+const CREATE_USERS_TABLE: &str = r#"
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+"#;
+
 pub async fn init_pool(database_url: &str) -> anyhow::Result<PgPool> {
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -36,6 +49,7 @@ pub async fn init_pool(database_url: &str) -> anyhow::Result<PgPool> {
     // Ensure tables exist
     sqlx::query(CREATE_UPLOADS_TABLE).execute(&pool).await?;
     sqlx::query(CREATE_RESULTS_TABLE).execute(&pool).await?;
+    sqlx::query(CREATE_USERS_TABLE).execute(&pool).await?;
 
     Ok(pool)
 }
@@ -49,4 +63,37 @@ pub async fn mark_upload_failed(pool: &PgPool, upload_id: uuid::Uuid) -> anyhow:
         .await?;
 
     Ok(())
+}
+
+pub async fn ensure_default_user(
+    pool: &PgPool,
+    username: &str,
+    password: &str,
+    role: &str,
+) -> Result<(), AppError> {
+    let password_hash = auth::hash_password(password)?;
+    sqlx::query(
+        "INSERT INTO users (id, username, password_hash, role) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (username) DO NOTHING",
+    )
+    .bind(Uuid::new_v4())
+    .bind(username)
+    .bind(password_hash)
+    .bind(role)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn find_user_by_username(
+    pool: &PgPool,
+    username: &str,
+) -> Result<Option<UserRecord>, sqlx::Error> {
+    sqlx::query_as::<_, UserRecord>(
+        "SELECT id, username, password_hash, role FROM users WHERE username = $1",
+    )
+    .bind(username)
+    .fetch_optional(pool)
+    .await
 }

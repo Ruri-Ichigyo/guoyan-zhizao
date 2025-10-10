@@ -1,7 +1,7 @@
 # Multi-stage build for Rust backend
 
 # Build stage
-FROM rust:1.75-slim as builder
+FROM rust:1.75-slim AS builder
 
 # Install dependencies for compilation
 RUN apt-get update && apt-get install -y \
@@ -33,6 +33,7 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

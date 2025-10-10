@@ -1,9 +1,13 @@
 use std::collections::HashMap;
 
 use axum::{extract::State, Json};
-use serde::Serialize;
 
-use crate::{errors::AppError, models::StatisticsResponse, AppState};
+use crate::{
+    auth::{ensure_role, AuthUser, ROLE_ADMIN, ROLE_OPERATOR, ROLE_VIEWER},
+    errors::AppError,
+    models::StatisticsResponse,
+    AppState,
+};
 
 #[derive(sqlx::FromRow)]
 struct UploadStatsRow {
@@ -20,8 +24,11 @@ struct ResultStatsRow {
 }
 
 pub async fn statistics(
+    user: AuthUser,
     State(state): State<AppState>,
 ) -> Result<Json<StatisticsResponse>, AppError> {
+    ensure_role(&user, &[ROLE_ADMIN, ROLE_OPERATOR, ROLE_VIEWER])?;
+
     let upload_stats = sqlx::query_as::<_, UploadStatsRow>(
         "SELECT 
             COUNT(*)::bigint AS total,

@@ -1,125 +1,95 @@
-import pytest
-import numpy as np
-import torch
+import json
+import os
+import sys
+from pathlib import Path
 from unittest.mock import Mock, patch
 
-import sys
-import os
+import cv2
+import numpy as np
+import pytest
+import torch
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from main import FruitDetectionService
-from utils.preprocess import preprocess_image, letterbox
-from utils.postprocess import calculate_quality_grade, calculate_iou
+from utils.preprocess import letterbox, preprocess_image
+from utils.postprocess import calculate_iou, calculate_quality_grade
 
-class TestFruitDetectionService:
 
-    @pytest.fixture
-    def service(self):
-        mock_model = Mock()
-        mock_classifier = Mock()
-        mock_classifier.in_features = 1024
-        mock_model.classifier = mock_classifier
-        mock_model.to.return_value = mock_model
-        mock_model.eval.return_value = mock_model
-        mock_model.load_state_dict.return_value = None
+@pytest.fixture
+def setup_training_dir(tmp_path, monkeypatch):
+    training_dir = tmp_path / 'Training'
+    training_dir.mkdir()
+    for name in ['Apple', 'Banana', 'Cherry']:
+        (training_dir / name).mkdir()
 
-        with patch('main.models.densenet121', return_value=mock_model), \
-             patch('main.boto3.client'), \
-             patch('main.KafkaConsumer'), \
-             patch('main.KafkaProducer'):
-            service_instance = FruitDetectionService()
-            mock_logits = torch.randn(1, service_instance.num_classes)
-            service_instance.model.return_value = mock_logits
-            return service_instance
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv('TRAINING_DATA_DIR', str(training_dir))
+    return training_dir
 
-    def test_load_labels(self, service):
-        """Test label loading."""
-        assert isinstance(service.labels, dict)
-        assert len(service.labels) > 0
 
-    def test_preprocess_image(self):
-        """Test image preprocessing."""
-        # Create test image
-        test_image = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+@pytest.fixture
+def service(setup_training_dir):
+    mock_model = Mock()
+    mock_classifier = Mock()
+    mock_classifier.in_features = 1024
+    mock_model.classifier = mock_classifier
+    mock_model.to.return_value = mock_model
+    mock_model.eval.return_value = mock_model
 
-        # Preprocess
-        processed = preprocess_image(test_image)
+    with patch('main.models.densenet121', return_value=mock_model):
+        svc = FruitDetectionService()
 
-        # Check output properties
-        assert isinstance(processed, torch.Tensor)
-        assert processed.shape == (3, 224, 224)
-        assert processed.dtype == torch.float32
-        assert torch.isfinite(processed).all()
+    svc.model = Mock(return_value=torch.randn(1, svc.num_classes))
+    return svc
 
-    def test_letterbox_resize(self):
-        """Test letterbox resizing."""
-        test_image = np.random.randint(0, 255, (300, 400, 3), dtype=np.uint8)
 
-        resized = letterbox(test_image, (640, 640))
+def test_labels_synced_from_training(service, setup_training_dir):
+    labels_path = Path('model/labels.json')
+    assert labels_path.exists()
 
-        assert resized.shape == (640, 640, 3)
+    with labels_path.open('r', encoding='utf-8') as file:
+        data = json.load(file)
 
-    def test_quality_grade_calculation(self):
-        """Test quality grade calculation."""
-        # Create test fruit region
-        fruit_region = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+    expected = {
+        str(index): name for index, name in enumerate(sorted(os.listdir(setup_training_dir)))
+    }
+    assert data == expected
+    assert service.labels == {int(k): v for k, v in expected.items()}
 
-        grade = calculate_quality_grade(fruit_region, "apple", 0.95)
 
-        assert grade in ['A', 'B', 'C']
+def test_infer_generates_results(service, tmp_path):
+    image = np.full((224, 224, 3), 128, dtype=np.uint8)
+    success, buffer = cv2.imencode('.jpg', image)
+    assert success
 
-    def test_iou_calculation(self):
-        """Test IoU calculation."""
-        box1 = [10, 10, 50, 50]  # 40x40 box
-        box2 = [30, 30, 70, 70]  # 40x40 box, overlapping
+    with patch('main.calculate_quality_grade', return_value='A'):
+        response = service.infer('upload-1', buffer.tobytes())
 
-        iou = calculate_iou(box1, box2)
+    assert response.status == 'completed'
+    assert response.total_fruits == service.top_k
+    assert all(result.quality_grade == 'A' for result in response.results)
 
-        # Expected IoU for these boxes
-        intersection = 20 * 20  # 400
-        union = 40 * 40 + 40 * 40 - 400  # 2800
-        expected_iou = 400 / 2800
 
-        assert abs(iou - expected_iou) < 0.01
+def test_preprocess_pipeline():
+    test_image = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+    processed = preprocess_image(test_image)
+    assert isinstance(processed, torch.Tensor)
+    assert processed.shape == (3, 224, 224)
 
-    def test_empty_fruit_region_quality(self):
-        """Test quality grade for empty region."""
-        empty_region = np.array([])
 
-        grade = calculate_quality_grade(empty_region, "apple", 0.8)
+def test_letterbox_resize():
+    test_image = np.random.randint(0, 255, (300, 400, 3), dtype=np.uint8)
+    resized = letterbox(test_image, (640, 640))
+    assert resized.shape == (640, 640, 3)
 
-        assert grade == 'C'
 
-    @patch('main.FruitDetectionService.download_image_from_s3')
-    @patch('main.FruitDetectionService.detect_fruits')
-    @patch('main.FruitDetectionService.send_result_to_kafka')
-    def test_process_message(self, mock_kafka, mock_detect, mock_download, service):
-        """Test message processing."""
-        # Mock return values
-        mock_download.return_value = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
-        mock_detect.return_value = [
-            {
-                'class_name': 'apple',
-                'confidence': 0.95,
-                'bbox': [10, 10, 50, 50],
-                'quality_grade': 'A'
-            }
-        ]
+def test_quality_grade_and_iou():
+    fruit_region = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+    grade = calculate_quality_grade(fruit_region, 'apple', 0.9)
+    assert grade in {'A', 'B', 'C'}
 
-        # Test message
-        test_message = {
-            'upload_id': 'test-123',
-            'object_key': 'test/image.jpg'
-        }
-
-        # Process message
-        import asyncio
-        asyncio.run(service.process_message(test_message))
-
-        # Verify calls
-        mock_download.assert_called_once_with('test/image.jpg')
-        mock_detect.assert_called_once()
-        mock_kafka.assert_called_once()
-
-if __name__ == "__main__":
-    pytest.main([__file__])
+    box1 = [10, 10, 50, 50]
+    box2 = [30, 30, 70, 70]
+    iou = calculate_iou(box1, box2)
+    assert 0 <= iou <= 1

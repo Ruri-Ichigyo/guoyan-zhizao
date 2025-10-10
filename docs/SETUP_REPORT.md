@@ -7,6 +7,7 @@
 - 对照当前架构（前端 + Rust 后端 + FastAPI 推理服务）核对 `docker-compose.yml` 与核心配置，确认依赖关系清晰。
 - 更新主文档与脚本提示，确保所有说明示例均使用 `./scripts/start.sh` 与 `./scripts/dev-start.sh`。
 - 复核 `docs/PROJECT_GUIDE.md`、`docs/QUICKSTART.md` 等资料之间的链接与内容，保持信息来源一致。
+- 对齐后端新增的 JWT 认证与默认管理员逻辑，同步 API 与部署文档，确保首次登录流程清晰。
 
 ## 2. 目录速览
 
@@ -36,6 +37,7 @@
 | 快速上手 | `docs/QUICKSTART.md` | 两种启动方式与常见问题说明 |
 | 架构指南 | `docs/PROJECT_GUIDE.md` | 全局架构、模块职责、配置说明 |
 | API 手册 | `docs/API.md` | REST 接口定义与请求/响应示例 |
+| 认证逻辑 | `backend/src/auth.rs` | JWT 生成/校验、角色授权及默认管理员初始化 |
 
 ## 4. 启动与开发
 
@@ -45,6 +47,7 @@ cp .env.example .env
 ./scripts/start.sh
 ```
 - 服务启动后：前端 `http://localhost:3000`，后端 API `http://localhost:8080/api/v1`，AI 服务 `http://localhost:8002/health`。
+- 默认管理员凭证由 `.env` 中的 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 指定，首次登录可直接访问 `/login` 页面。
 - 常用运维命令：`docker compose ps`、`docker compose logs -f backend`、`docker compose down`。
 
 ### 本地开发模式
@@ -52,7 +55,7 @@ cp .env.example .env
 ./scripts/dev-start.sh  # 可选：自动启动 postgres/redis
 ```
 随后按需手动启动：
-- Rust 后端：在 `backend/` 执行 `cargo run`（需设置 `DATABASE_URL`、`REDIS_URL`、`AI_SERVICE_URL`）。
+- Rust 后端：在 `backend/` 执行 `cargo run`（需设置 `DATABASE_URL`、`REDIS_URL`、`AI_SERVICE_URL`，可选覆盖 `JWT_SECRET`、`ADMIN_USERNAME`、`ADMIN_PASSWORD`）。
 - FastAPI AI 服务：在 `ai/` 中执行 `uvicorn main:app --reload --host 0.0.0.0 --port 8002`。
 - Vue 前端：在 `frontend/` 中执行 `npm install && npm run dev`。
 
@@ -60,6 +63,7 @@ cp .env.example .env
 - `scripts/verify-setup.sh`：检查核心目录、关键文件与三大语言工具链是否可用。
 - `cargo test` / `pytest` / `vitest`：分别对应后端、AI 服务与前端单元测试（详见 `tests/` 目录）。
 - `docker compose ps`：确认容器化部署的健康状态。
+- `curl -X POST http://localhost:8080/api/v1/auth/login ...`：验证默认管理员是否可获取 JWT。
 
 ## 6. 后续建议
 1. 依据 `docs/PROJECT_GUIDE.md` 定期审视文档是否与实现同步，避免信息漂移。

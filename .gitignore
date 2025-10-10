@@ -223,3 +223,4 @@ __marimo__/
 k8s/
 secrets.yaml
 node_modules
+.DS_Store
