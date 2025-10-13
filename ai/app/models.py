@@ -82,21 +82,31 @@ class DenseNetModel(BaseModel):
         if os.path.exists(weights_path):
             try:
                 state_dict = torch.load(weights_path, map_location=self.device)
-                # Load only the matching layers (feature extractor), skip classifier if shape mismatch
-                model_dict = self.model.state_dict()
-                filtered_dict = {
-                    k: v
-                    for k, v in state_dict.items()
-                    if k in model_dict and v.shape == model_dict[k].shape
-                }
-                model_dict.update(filtered_dict)
-                self.model.load_state_dict(model_dict)
-                logger.info(
-                    "Loaded custom weights from %s (%d/%d layers)",
-                    weights_path,
-                    len(filtered_dict),
-                    len(state_dict),
-                )
+                # Try to load the complete state dict directly
+                try:
+                    self.model.load_state_dict(state_dict, strict=True)
+                    logger.info(
+                        "Loaded complete weights from %s (all %d layers)",
+                        weights_path,
+                        len(state_dict),
+                    )
+                except RuntimeError as e:
+                    # If strict loading fails, fallback to partial loading
+                    logger.warning(f"Strict loading failed: {e}. Attempting partial loading...")
+                    model_dict = self.model.state_dict()
+                    filtered_dict = {
+                        k: v
+                        for k, v in state_dict.items()
+                        if k in model_dict and v.shape == model_dict[k].shape
+                    }
+                    model_dict.update(filtered_dict)
+                    self.model.load_state_dict(model_dict)
+                    logger.info(
+                        "Loaded partial weights from %s (%d/%d layers)",
+                        weights_path,
+                        len(filtered_dict),
+                        len(state_dict),
+                    )
             except Exception as e:
                 logger.warning(f"Failed to load custom weights: {e}. Using pre-trained backbone only.")
         else:
@@ -115,9 +125,42 @@ class DenseNetModel(BaseModel):
     
     def _load_labels(self) -> Dict[int, str]:
         """Load class labels."""
-        # Try to load from Test directory first (actual available dataset)
+        # First, try to infer the number of classes from the weights file
+        weights_path = Path(config.MODEL_PATH)
+        expected_classes = None
+
+        if weights_path.exists():
+            try:
+                state_dict = torch.load(weights_path, map_location='cpu')
+                if 'classifier.weight' in state_dict:
+                    expected_classes = state_dict['classifier.weight'].shape[0]
+                    logger.info(f"Detected {expected_classes} classes from model weights")
+            except Exception as e:
+                logger.warning(f"Could not read class count from weights: {e}")
+
+        # Try to load from labels.json first (most reliable)
+        try:
+            labels_path = Path(config.LABELS_PATH)
+            if labels_path.exists():
+                with open(labels_path, 'r') as f:
+                    labels_dict = json.load(f)
+                    dataset_labels = {int(k): v for k, v in labels_dict.items()}
+
+                    # Verify the number matches expected classes
+                    if expected_classes and len(dataset_labels) != expected_classes:
+                        logger.warning(
+                            f"labels.json has {len(dataset_labels)} classes "
+                            f"but model expects {expected_classes}"
+                        )
+                    else:
+                        logger.info(f"Loaded {len(dataset_labels)} class labels from {labels_path}")
+                        return dataset_labels
+        except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
+            logger.warning(f"Failed to load labels from labels.json: {e}")
+
+        # Try to load from Test directory
         test_dir = Path(config.TEST_DATA_DIR)
-        
+
         dataset_labels: Dict[int, str] = {}
         if test_dir.exists() and test_dir.is_dir():
             folder_names = sorted(
@@ -125,14 +168,23 @@ class DenseNetModel(BaseModel):
             )
             if folder_names:
                 dataset_labels = {index: name for index, name in enumerate(folder_names)}
-                self._persist_labels(dataset_labels)
-                logger.info(
-                    "Loaded %s class labels from test folder %s",
-                    len(dataset_labels),
-                    test_dir,
-                )
-                return dataset_labels
-            logger.warning("Test directory %s has no class folders", test_dir)
+
+                # Only use if it matches expected classes
+                if expected_classes is None or len(dataset_labels) == expected_classes:
+                    self._persist_labels(dataset_labels)
+                    logger.info(
+                        "Loaded %s class labels from test folder %s",
+                        len(dataset_labels),
+                        test_dir,
+                    )
+                    return dataset_labels
+                else:
+                    logger.warning(
+                        f"Test directory has {len(dataset_labels)} classes "
+                        f"but model expects {expected_classes}"
+                    )
+            else:
+                logger.warning("Test directory %s has no class folders", test_dir)
 
         # Fallback to Training directory
         training_dir = Path(config.TRAINING_DATA_DIR)
@@ -155,7 +207,22 @@ class DenseNetModel(BaseModel):
         try:
             with open(config.LABELS_PATH, "r", encoding="utf-8") as file:
                 raw_labels = json.load(file)
-            labels = {int(k): v for k, v in raw_labels.items()}
+
+            # Handle different JSON formats
+            if isinstance(raw_labels, dict):
+                if "labels" in raw_labels:
+                    # Format: {"labels": ["Class1", "Class2", ...]}
+                    labels_list = raw_labels["labels"]
+                    labels = {i: name for i, name in enumerate(labels_list)}
+                else:
+                    # Format: {"0": "Class1", "1": "Class2", ...}
+                    labels = {int(k): v for k, v in raw_labels.items()}
+            elif isinstance(raw_labels, list):
+                # Format: ["Class1", "Class2", ...]
+                labels = {i: name for i, name in enumerate(raw_labels)}
+            else:
+                raise ValueError(f"Unexpected labels format: {type(raw_labels)}")
+
             logger.info("Loaded %s class labels from labels.json", len(labels))
             return labels
         except FileNotFoundError:

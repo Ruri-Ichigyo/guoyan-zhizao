@@ -122,7 +122,7 @@ pub async fn get_result(
     .await?;
 
     let Some(row) = row else {
-        return Err(AppError::NotFound);
+        return Err(AppError::NotFound(format!("Result {} not found", result_id)));
     };
 
     let detections_value = row

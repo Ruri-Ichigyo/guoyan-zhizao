@@ -140,3 +140,32 @@ pub struct DetailedRow {
     pub grade_c: Option<i32>,
     pub avg_confidence: Option<f32>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LiveDetection {
+    pub id: Uuid,
+    pub snapshot: Vec<u8>,
+    pub labels: Vec<String>,
+    pub confidence_scores: Vec<f32>,
+    pub detected_classes: Vec<String>,
+    pub created_at: DateTime<Utc>,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LiveDetectionSummary {
+    pub id: Uuid,
+    pub labels: Vec<String>,
+    pub confidence_scores: Vec<f32>,
+    pub detected_classes: Vec<String>,
+    pub created_at: DateTime<Utc>,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateLiveDetectionRequest {
+    pub snapshot: String, // base64 encoded image
+    pub labels: Vec<String>,
+    pub confidence_scores: Vec<f32>,
+    pub detected_classes: Vec<String>,
+}

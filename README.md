@@ -168,3 +168,4 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 - [API 参考](docs/API.md)：REST 接口定义与示例
 - [算法说明](docs/ALGORITHM.md)：模型训练与推理细节
 - [搭建核对](docs/SETUP_REPORT.md)：仓库结构与必备文件检查
+- [部署测试报告](DEPLOYMENT_REPORT.md)：最新部署和测试详情

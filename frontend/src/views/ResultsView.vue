@@ -513,6 +513,7 @@ import {
   Delete
 } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
+import { getCategoryPlaceholder } from '@/utils/placeholder'
 const categoryOptions = ref([
   { label: '苹果', value: 'apple' },
   { label: '香蕉', value: 'banana' },
@@ -687,18 +688,8 @@ const loadResults = async () => {
       if (detectedAt < new Date(start) || detectedAt > new Date(end)) continue
     }
 
-    // Use placeholder images instead of non-existent API images
-    const placeholderImages = [
-      'https://via.placeholder.com/300x300/67c23a/ffffff?text=Apple',
-      'https://via.placeholder.com/300x300/e6a23c/ffffff?text=Orange',
-      'https://via.placeholder.com/300x300/f9d71c/ffffff?text=Banana',
-      'https://via.placeholder.com/300x300/67c23a/ffffff?text=Pear',
-      'https://via.placeholder.com/300x300/722ed1/ffffff?text=Grape',
-      'https://via.placeholder.com/300x300/ff4d4f/ffffff?text=Watermelon',
-      'https://via.placeholder.com/300x300/999/ffffff?text=Other'
-    ]
-    const categoryIndex = categories.indexOf(category)
-    const imageUrl = placeholderImages[categoryIndex] || placeholderImages[6]
+    // Use local placeholder images
+    const imageUrl = getCategoryPlaceholder(category)
 
     mockResults.push({
       id: `result_${i}`,

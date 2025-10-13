@@ -60,7 +60,7 @@ chmod +x scripts/*.sh
 - 前端界面: http://localhost:3000
 - 后端 API: http://localhost:8080
 - API 文档: http://localhost:8080/api/docs
-- AI 服务: http://localhost:8000
+- AI 服务: http://localhost:8002
 
 ## 组件与资源建议
 

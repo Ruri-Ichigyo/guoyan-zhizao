@@ -11,8 +11,11 @@ pub enum AppError {
     #[error("validation error: {0}")]
     Validation(String),
 
-    #[error("resource not found")]
-    NotFound,
+    #[error("validation error: {0}")]
+    ValidationError(String),
+
+    #[error("resource not found: {0}")]
+    NotFound(String),
 
     #[error("unauthorized: {0}")]
     Unauthorized(String),
@@ -22,6 +25,9 @@ pub enum AppError {
 
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
+
+    #[error("database error: {0}")]
+    DatabaseError(String),
 
     #[error("cache error: {0}")]
     Cache(#[from] redis::RedisError),
@@ -47,11 +53,11 @@ struct ErrorResponse {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let status = match self {
-            AppError::Validation(_) => StatusCode::BAD_REQUEST,
-            AppError::NotFound => StatusCode::NOT_FOUND,
+            AppError::Validation(_) | AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             AppError::Forbidden(_) => StatusCode::FORBIDDEN,
-            AppError::Database(_) | AppError::Cache(_) | AppError::HttpClient(_) => {
+            AppError::Database(_) | AppError::DatabaseError(_) | AppError::Cache(_) | AppError::HttpClient(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
             AppError::Unexpected(_) => StatusCode::INTERNAL_SERVER_ERROR,

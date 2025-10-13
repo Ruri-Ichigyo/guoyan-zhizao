@@ -14,8 +14,9 @@
       </p>
     </section>
 
-    <section class="features-section w-full max-w-3xl lg:max-w-4xl">
-      <div class="features-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+    <section class="features-section w-full max-w-5xl">
+      <div class="features-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- 第一行：3个卡片 -->
         <div class="feature-card-custom animate-zoom-in" @click="goTo('/upload')">
           <div class="card-content">
             <el-icon class="card-icon"><Upload /></el-icon>
@@ -40,15 +41,24 @@
           </div>
         </div>
 
+        <!-- 第二行：3个卡片 -->
         <div class="feature-card-custom animate-zoom-in delay-300" @click="goTo('/results')">
           <div class="card-content">
-            <el-icon class="card-icon"><Document /></el-icon>
+            <el-icon class="card-icon"><List /></el-icon>
             <h2 class="card-title">结果查看</h2>
             <p class="card-description">查看历史分拣结果</p>
           </div>
         </div>
 
-        <div class="feature-card-custom animate-zoom-in delay-400" @click="goTo('/sort')">
+        <div class="feature-card-custom animate-zoom-in delay-400" @click="goTo('/detections')">
+          <div class="card-content">
+            <el-icon class="card-icon"><VideoCamera /></el-icon>
+            <h2 class="card-title">识别记录</h2>
+            <p class="card-description">查看实时监控识别记录</p>
+          </div>
+        </div>
+
+        <div class="feature-card-custom animate-zoom-in delay-500" @click="goTo('/sort')">
           <div class="card-content">
             <el-icon class="card-icon"><Operation /></el-icon>
             <h2 class="card-title">分拣控制</h2>
@@ -62,15 +72,13 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { Upload, Camera, DataAnalysis, Document, Operation } from '@element-plus/icons-vue' // Import necessary icons
+import { Upload, Camera, DataAnalysis, List, VideoCamera, Operation } from '@element-plus/icons-vue' // Import necessary icons
 
 const router = useRouter()
 
 const goTo = (path: string) => {
   router.push(path)
 }
-
-// getImageUrl is no longer needed as we are using Element Plus icons
 </script>
 
 <style scoped>
@@ -197,9 +205,10 @@ const goTo = (path: string) => {
   animation: zoom-in 0.6s ease-out forwards;
 }
 .animate-zoom-in.delay-100 { animation-delay: 0.8s; }
-.animate-zoom-in.delay-200 { animation-delay: 1.1s; }
-.animate-zoom-in.delay-300 { animation-delay: 1.4s; }
-.animate-zoom-in.delay-400 { animation-delay: 1.7s; }
+.animate-zoom-in.delay-200 { animation-delay: 1.0s; }
+.animate-zoom-in.delay-300 { animation-delay: 1.2s; }
+.animate-zoom-in.delay-400 { animation-delay: 1.4s; }
+.animate-zoom-in.delay-500 { animation-delay: 1.6s; }
 
 @keyframes rotate {
   0% { transform: rotate(0deg); }

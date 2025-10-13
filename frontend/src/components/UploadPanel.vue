@@ -106,39 +106,65 @@
           <el-descriptions-item label="处理时间">{{ formatTime(currentResult.timestamp) }}</el-descriptions-item>
         </el-descriptions>
 
-        <div v-if="currentResult.results && currentResult.results.length > 0" class="mt-4">
-          <h4 class="text-base font-semibold mb-3">检测详情</h4>
-          <el-table :data="currentResult.results" border stripe max-height="400">
-            <el-table-column type="index" label="#" width="50" />
-            <el-table-column prop="class_name" label="类别" width="120">
-              <template #default="{ row }">
-                <el-tag size="small">{{ row.class_name }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="confidence" label="置信度" width="120">
-              <template #default="{ row }">
-                <el-progress
-                  :percentage="Math.round(row.confidence * 100)"
-                  :stroke-width="6"
-                  :color="getConfidenceColor(row.confidence * 100)"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column prop="quality_grade" label="质量等级" width="120">
-              <template #default="{ row }">
-                <el-tag :type="getQualityTagType(row.quality_grade)" size="small">
-                  {{ row.quality_grade || '未评级' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="边界框" min-width="200">
-              <template #default="{ row }">
-                <span v-if="row.bbox" class="text-xs">
-                  [{{ row.bbox.join(', ') }}]
-                </span>
-              </template>
-            </el-table-column>
-          </el-table>
+        <div v-if="currentResult.detections && currentResult.detections.length > 0" class="mt-4">
+          <h4 class="text-base font-semibold mb-3">识别结果</h4>
+          <!-- Show only the top prediction (first detection with highest confidence) -->
+          <el-card shadow="hover" class="result-card">
+            <div class="flex items-center justify-between">
+              <div class="flex-1">
+                <div class="text-lg font-semibold mb-2">
+                  <el-tag size="large" type="success">
+                    {{ currentResult.detections[0].class_name }}
+                  </el-tag>
+                </div>
+                <div class="mb-2">
+                  <span class="text-sm text-gray-600">置信度:</span>
+                  <el-progress
+                    :percentage="Math.round(currentResult.detections[0].confidence * 100)"
+                    :stroke-width="8"
+                    :color="getConfidenceColor(currentResult.detections[0].confidence * 100)"
+                    class="mt-1"
+                  />
+                </div>
+                <div>
+                  <span class="text-sm text-gray-600">质量等级:</span>
+                  <el-tag
+                    :type="getQualityTagType(currentResult.detections[0].quality_grade)"
+                    size="large"
+                    class="ml-2"
+                  >
+                    {{ currentResult.detections[0].quality_grade || '未评级' }}
+                  </el-tag>
+                </div>
+              </div>
+            </div>
+          </el-card>
+
+          <!-- Optional: Show all detections in a collapsible section -->
+          <el-collapse class="mt-4" v-if="currentResult.detections.length > 1">
+            <el-collapse-item title="查看所有检测结果" name="1">
+              <el-table :data="currentResult.detections" border stripe max-height="300">
+                <el-table-column type="index" label="#" width="50" />
+                <el-table-column prop="class_name" label="类别" width="150">
+                  <template #default="{ row }">
+                    <el-tag size="small">{{ row.class_name }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="confidence" label="置信度" width="150">
+                  <template #default="{ row }">
+                    {{ (row.confidence * 100).toFixed(2) }}%
+                  </template>
+                </el-table-column>
+                <el-table-column prop="quality_grade" label="质量等级" width="100">
+                  <template #default="{ row }">
+                    <el-tag :type="getQualityTagType(row.quality_grade)" size="small">
+                      {{ row.quality_grade || '未评级' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-collapse-item>
+          </el-collapse>
         </div>
 
         <div v-else class="mt-4 text-center text-gray-500">
@@ -312,7 +338,7 @@ const exportResult = () => {
       status: currentResult.value.status,
       total_fruits: currentResult.value.total_fruits,
       timestamp: currentResult.value.timestamp,
-      results: currentResult.value.results,
+      detections: currentResult.value.detections,
       metadata: currentResult.value.metadata
     }
 

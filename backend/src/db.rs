@@ -27,6 +27,18 @@ CREATE TABLE IF NOT EXISTS results (
 );
 "#;
 
+const CREATE_DETECTIONS_TABLE: &str = r#"
+CREATE TABLE IF NOT EXISTS detections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    snapshot BYTEA NOT NULL,
+    labels TEXT[] NOT NULL,
+    confidence_scores REAL[] NOT NULL,
+    detected_classes TEXT[] NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    source TEXT DEFAULT 'live_camera'
+);
+"#;
+
 pub async fn init_pool(database_url: &str) -> anyhow::Result<PgPool> {
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -36,6 +48,7 @@ pub async fn init_pool(database_url: &str) -> anyhow::Result<PgPool> {
     // Ensure tables exist
     sqlx::query(CREATE_UPLOADS_TABLE).execute(&pool).await?;
     sqlx::query(CREATE_RESULTS_TABLE).execute(&pool).await?;
+    sqlx::query(CREATE_DETECTIONS_TABLE).execute(&pool).await?;
 
     Ok(pool)
 }

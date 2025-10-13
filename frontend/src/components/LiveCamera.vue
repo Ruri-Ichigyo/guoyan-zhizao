@@ -574,46 +574,68 @@ const onVideoCanPlay = () => {
 
 // Lifecycle
 onMounted(async () => {
-  // Check for camera permissions
+  // Check for camera permissions and available devices
   try {
-    // Request permissions first to get device labels
-    await navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-      stream.getTracks().forEach(track => track.stop())
-    }).catch(() => {
-      console.warn('Camera permission denied or not available')
-    })
+    // First, check if mediaDevices API is available
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.warn('MediaDevices API not available. This may be due to missing HTTPS.')
+      // Keep RTSP/WebRTC options available
+      availableCameras.value = availableCameras.value.filter(cam => cam.type !== 'webcam')
+      if (availableCameras.value.length > 0) {
+        currentCameraId.value = availableCameras.value[0].id
+      }
+      return
+    }
 
+    // Try to get device permissions to enumerate device labels
+    let permissionGranted = false
+    try {
+      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
+      tempStream.getTracks().forEach(track => track.stop())
+      permissionGranted = true
+    } catch (permError) {
+      console.warn('Camera permission denied or not available:', permError)
+      // Permission denied is not a fatal error - RTSP/WebRTC can still work
+    }
+
+    // Enumerate available video devices
     const devices = await navigator.mediaDevices.enumerateDevices()
     const videoDevices = devices.filter(device => device.kind === 'videoinput')
 
     if (videoDevices.length === 0) {
-      console.warn('No video input devices found')
+      console.info('No webcam devices detected. RTSP/WebRTC cameras are still available.')
       // Keep RTSP/WebRTC options available
       availableCameras.value = availableCameras.value.filter(cam => cam.type !== 'webcam')
       if (availableCameras.value.length > 0) {
         currentCameraId.value = availableCameras.value[0].id
       }
     } else {
-      // Update available cameras with actual devices
+      // Map detected devices to camera list
       const webcams = videoDevices.map((device, index) => ({
         id: device.deviceId || `webcam_${index}`,
         name: device.label || `摄像头 ${index + 1}`,
         type: 'webcam' as const
       }))
 
+      // Combine webcams with RTSP/WebRTC options
       availableCameras.value = [
         ...webcams,
         ...availableCameras.value.filter(cam => cam.type !== 'webcam')
       ]
 
-      // Update current camera to first webcam if default was selected
+      // Set default camera to first available webcam
       if (currentCameraId.value === 'default' && webcams.length > 0) {
         currentCameraId.value = webcams[0].id
       }
     }
   } catch (error) {
-    console.error('Failed to enumerate devices:', error)
-    ElMessage.warning('无法检测摄像头设备，请检查浏览器权限')
+    console.error('Failed to initialize camera devices:', error)
+    // Don't show error message unless user tries to start stream
+    // Keep RTSP/WebRTC options as fallback
+    availableCameras.value = availableCameras.value.filter(cam => cam.type !== 'webcam')
+    if (availableCameras.value.length > 0) {
+      currentCameraId.value = availableCameras.value[0].id
+    }
   }
 })
 

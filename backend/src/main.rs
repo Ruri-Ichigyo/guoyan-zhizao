@@ -19,6 +19,7 @@ use crate::{
     config::AppConfig,
     db::init_pool,
     routes::{
+        detections::{create_detection, get_detection, get_detection_snapshot, list_detections},
         health::health,
         results::{get_result, list_results},
         statistics::statistics,
@@ -62,6 +63,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/results", get(list_results))
         .route("/api/v1/results/:result_id", get(get_result))
         .route("/api/v1/statistics", get(statistics))
+        .route("/api/v1/detections", post(create_detection))
+        .route("/api/v1/detections", get(list_detections))
+        .route("/api/v1/detections/:id", get(get_detection))
+        .route("/api/v1/detections/:id/snapshot", get(get_detection_snapshot))
         .with_state(state)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http());

@@ -29,6 +29,10 @@
               <el-icon><List /></el-icon>
               <span>结果查看</span>
             </el-menu-item>
+            <el-menu-item index="/detections">
+              <el-icon><VideoCamera /></el-icon>
+              <span>识别记录</span>
+            </el-menu-item>
             <el-menu-item index="/sort">
               <el-icon><Operation /></el-icon>
               <span>分拣控制</span>
