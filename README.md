@@ -20,7 +20,10 @@
 - Docker Compose v2
 
 ```bash
+# 如果没有 .env 文件，从示例创建
 cp .env.example .env
+
+# 使用启动脚本一键部署
 ./scripts/start.sh
 ```
 
@@ -77,7 +80,31 @@ npm run dev
 # 开发代理默认指向 http://localhost:8080
 ```
 
-### 3. 认证与默认账号
+### 3. 测试部署
+
+部署完成后，可以测试各个服务：
+
+```bash
+# 检查所有服务状态
+docker compose ps
+
+# 测试健康检查端点
+curl http://localhost:8002/health  # AI 服务
+curl http://localhost:8080/health  # 后端服务
+curl http://localhost:3000/health  # 前端服务
+
+# 测试上传图片并识别
+curl -X POST http://localhost:8080/api/v1/uploads \
+  -F "file=@path/to/your/fruit-image.jpg"
+
+# 查看统计信息
+curl http://localhost:8080/api/v1/statistics
+
+# 查看结果列表
+curl http://localhost:8080/api/v1/results
+```
+
+### 4. 认证与默认账号
 
 后端启用了基于 JWT 的认证流程。服务启动时会在数据库中确保存在一个默认管理员账号，便于首次登录：
 
@@ -104,13 +131,20 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 
 ## API 概要
 
-- `POST /api/v1/auth/login`：使用用户名与密码换取访问令牌
-- `GET /api/v1/auth/me`：校验令牌并返回当前用户信息
-- `POST /api/v1/uploads`：上传图片并返回检测结果
+**后端 API (http://localhost:8080)**
+
+- `POST /api/v1/uploads`：上传图片并返回检测结果（主要功能）
 - `GET /api/v1/results`：分页查询历史记录
 - `GET /api/v1/results/{id}`：获取单条检测详情
 - `GET /api/v1/statistics`：统计上传与识别概况
-- `GET /health`：服务健康检查
+- `GET /health`：后端服务健康检查
+
+**AI 服务 API (http://localhost:8002)**
+
+- `POST /infer`：图像推理接口（由后端调用）
+- `GET /health`：AI 服务健康检查
+- `GET /models`：列出所有已注册模型
+- `GET /metrics`：获取服务指标
 
 详细说明见 [docs/API.md](docs/API.md)。
 

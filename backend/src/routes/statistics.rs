@@ -2,12 +2,7 @@ use std::collections::HashMap;
 
 use axum::{extract::State, Json};
 
-use crate::{
-    auth::{ensure_role, AuthUser, ROLE_ADMIN, ROLE_OPERATOR, ROLE_VIEWER},
-    errors::AppError,
-    models::StatisticsResponse,
-    AppState,
-};
+use crate::{errors::AppError, models::StatisticsResponse, AppState};
 
 #[derive(sqlx::FromRow)]
 struct UploadStatsRow {
@@ -23,12 +18,7 @@ struct ResultStatsRow {
     avg_confidence: Option<f64>,
 }
 
-pub async fn statistics(
-    user: AuthUser,
-    State(state): State<AppState>,
-) -> Result<Json<StatisticsResponse>, AppError> {
-    ensure_role(&user, &[ROLE_ADMIN, ROLE_OPERATOR, ROLE_VIEWER])?;
-
+pub async fn statistics(State(state): State<AppState>) -> Result<Json<StatisticsResponse>, AppError> {
     let upload_stats = sqlx::query_as::<_, UploadStatsRow>(
         "SELECT 
             COUNT(*)::bigint AS total,

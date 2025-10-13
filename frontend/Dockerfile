@@ -46,8 +46,39 @@ RUN rm -rf /usr/share/nginx/html/*
 # Copy built application from build stage
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
-# Copy custom nginx configuration
-COPY <<EOF /etc/nginx/conf.d/default.conf
+# Copy custom nginx main configuration for non-root user
+COPY <<'EOF' /etc/nginx/nginx.conf
+user nextjs;
+worker_processes auto;
+error_log /var/log/nginx/error.log warn;
+pid /var/run/nginx/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log /var/log/nginx/access.log main;
+
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+
+    include /etc/nginx/conf.d/*.conf;
+}
+EOF
+
+# Copy custom nginx site configuration
+COPY <<'EOF' /etc/nginx/conf.d/default.conf
 server {
     listen 80;
     server_name localhost;
@@ -71,21 +102,21 @@ server {
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
-        try_files \$uri =404;
+        try_files $uri =404;
     }
 
     # Handle Vue.js routing - always serve index.html for non-existent files
     location / {
-        try_files \$uri \$uri/ /index.html;
+        try_files $uri $uri/ /index.html;
     }
 
     # API proxy (optional - for development/testing)
     location /api/v1/ {
         proxy_pass http://backend:8080/api/v1/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_connect_timeout 30s;
         proxy_send_timeout 30s;
         proxy_read_timeout 30s;
@@ -136,9 +167,15 @@ EOF
 # Make startup script executable
 RUN chmod +x /docker-entrypoint.sh
 
-# Change ownership of the web root
-RUN chown -R nextjs:nodejs /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html
+# Prepare runtime directories and adjust permissions
+RUN set -eux; \
+    for dir in /var/cache/nginx /var/cache/nginx/client_temp /var/cache/nginx/proxy_temp /var/cache/nginx/fastcgi_temp /var/cache/nginx/uwsgi_temp /var/cache/nginx/scgi_temp /var/run/nginx /tmp/nginx; do \
+        mkdir -p "${dir}"; \
+    done; \
+    chown -R nextjs:nodejs /var/cache/nginx /var/run/nginx /tmp/nginx; \
+    chown -R nextjs:nodejs /usr/share/nginx/html; \
+    chmod -R 755 /usr/share/nginx/html; \
+    touch /var/run/nginx/nginx.pid && chown nextjs:nodejs /var/run/nginx/nginx.pid
 
 # Switch to non-root user
 USER nextjs

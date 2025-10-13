@@ -1,15 +1,24 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, NaiveDateTime, Utc};
+use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize)]
-pub struct UserProfile {
-    pub user_id: Uuid,
-    pub username: String,
-    pub role: String,
+// Custom deserializer for DateTime<Utc> that accepts naive datetime strings
+fn deserialize_datetime<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    // Try parsing with timezone first
+    if let Ok(dt) = DateTime::parse_from_rfc3339(&s) {
+        return Ok(dt.with_timezone(&Utc));
+    }
+    // Fall back to naive datetime and assume UTC
+    NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.f")
+        .map(|naive| naive.and_utc())
+        .map_err(serde::de::Error::custom)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,7 +35,10 @@ pub struct AiInferenceResponse {
     pub status: String,
     pub results: Vec<DetectionRecord>,
     pub total_fruits: usize,
+    #[serde(deserialize_with = "deserialize_datetime")]
     pub timestamp: DateTime<Utc>,
+    #[serde(default)]
+    pub metadata: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -127,12 +139,4 @@ pub struct DetailedRow {
     pub grade_b: Option<i32>,
     pub grade_c: Option<i32>,
     pub avg_confidence: Option<f32>,
-}
-
-#[derive(Debug, FromRow)]
-pub struct UserRecord {
-    pub id: Uuid,
-    pub username: String,
-    pub password_hash: String,
-    pub role: String,
 }

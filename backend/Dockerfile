@@ -1,7 +1,7 @@
 # Multi-stage build for Rust backend
 
 # Build stage
-FROM rust:1.75-slim AS builder
+FROM rust:1.85-slim AS builder
 
 # Install dependencies for compilation
 RUN apt-get update && apt-get install -y \
@@ -12,18 +12,12 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy Cargo files first to leverage Docker layer caching
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
-# Create a dummy main.rs to build dependencies
-RUN mkdir src && \
-    echo "fn main() {}" > src/main.rs && \
-    cargo build --release && \
-    rm -rf src
-
-# Copy actual source code
+# Copy source code
 COPY src ./src
 
-# Build the application
+# Build the application (let Cargo generate a new lockfile with compatible versions)
 RUN cargo build --release
 
 # Runtime stage

@@ -31,7 +31,6 @@ cp .env.example .env
 - AI 服务：http://localhost:8002/health
 - PostgreSQL：`postgres://gyz:gyz123@localhost:5432/gyz`
 - Redis：`redis://localhost:6379`
-- 默认管理员：`admin` / `admin123456`
 
 常用命令：
 ```bash
@@ -56,10 +55,6 @@ cd backend
 export DATABASE_URL=postgres://gyz:gyz123@localhost:5432/gyz
 export REDIS_URL=redis://localhost:6379
 export AI_SERVICE_URL=http://localhost:8002
-export JWT_SECRET=local-dev-secret           # 可选：覆盖 JWT 密钥
-export JWT_TTL_SECONDS=3600                  # 可选：令牌有效期（秒）
-export ADMIN_USERNAME=admin                  # 可选：覆盖默认管理员账号
-export ADMIN_PASSWORD=admin123456            # 可选：覆盖默认管理员密码
 cargo run
 ```
 
@@ -81,26 +76,11 @@ npm run dev
 
 ---
 
-## 获取访问令牌
-
-后端业务接口要求携带 `Authorization: Bearer <token>` 请求头。首次启动可使用默认管理员账号登录，或在 `.env` 中通过 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 自定义后重启服务。
-
-```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123456"}'
-```
-
-返回结果包含 `token` 与 `expires_at` 字段，前端应用会自动保存并附带到后续请求。
-
----
-
 ## 数据初始化
 
 首次启动会自动创建以下表结构：
 - `uploads`：存储原始文件及状态
 - `results`：存储检测详情和统计指标
-- `users`：存储登录账户的加盐密码与角色信息
 
 如需清空数据，可执行：
 ```bash

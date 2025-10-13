@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { Mock } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import type { UploadResult } from '../../frontend/src/api/upload'
-import { useUserStore } from '../../frontend/src/stores/user'
 
 vi.mock('../../frontend/src/api/upload', () => ({
   uploadApi: {
@@ -178,18 +177,10 @@ beforeEach(() => {
   })
   getResultMock.mockResolvedValue(mockDetailedResult)
   getStatisticsMock.mockResolvedValue(mockStatistics)
-  const store = useUserStore()
-  store.setAuth('mock-token', new Date(Date.now() + 60 * 1000).toISOString(), {
-    user_id: 'user-1',
-    username: 'tester',
-    role: 'operator'
-  })
 })
 
 afterEach(() => {
   vi.clearAllMocks()
-  const store = useUserStore()
-  store.clearAuth()
 })
 
 describe('UploadPanel', () => {
@@ -244,27 +235,6 @@ describe('UploadPanel', () => {
     wrapper.unmount()
   })
 
-  it('blocks upload when user lacks permission', async () => {
-    const store = useUserStore()
-    store.setAuth('mock-token', new Date(Date.now() + 60 * 1000).toISOString(), {
-      user_id: 'viewer-1',
-      username: 'viewer',
-      role: 'viewer'
-    })
-
-    const wrapper = createWrapper()
-    await flushPromises()
-
-    const imageFile = new File(['binary'], 'fruit.jpg', { type: 'image/jpeg' })
-    await wrapper.vm.handleFileChange({
-      target: { files: [imageFile], value: 'dummy' }
-    } as unknown as Event)
-
-    expect(uploadApiMock).not.toHaveBeenCalled()
-    expect(messageErrorMock).not.toHaveBeenCalled()
-    expect(ElMessage.warning).toHaveBeenCalledWith('当前账号无权上传图片')
-    wrapper.unmount()
-  })
 })
 
 describe('ResultsView', () => {

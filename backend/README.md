@@ -15,6 +15,14 @@ Rust 编写的单体服务，负责：
 - Reqwest：调用 AI FastAPI 服务
 - Tracing：结构化日志
 
+## 架构图
+
+为了更直观地理解后端服务的架构和业务流程，我们提供了详细的 UML 图表，包括系统架构图、序列图和工作流图。
+
+**[查看详细图表及说明](UML-DIAGRAMS-README.md)**
+
+所有图表均可通过 `generate-diagrams.sh` 脚本自动生成。
+
 ## 目录结构
 
 ```
@@ -45,6 +53,8 @@ export REDIS_URL=redis://localhost:6379
 export AI_SERVICE_URL=http://localhost:8002
 cargo run
 ```
+
+> Rust 工具链要求：1.82.0 或更高版本（仓库根目录的 `rust-toolchain.toml` 会自动安装匹配版本）。
 
 ## 数据表
 

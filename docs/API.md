@@ -2,57 +2,16 @@
 
 本文档描述精简后的核心接口。所有 HTTP 接口均由 Rust 后端服务提供，默认基础 URL：`http://localhost:8080/api/v1`。
 
-## 认证
+## 访问说明
 
-系统内置基于 JWT 的登录与会话校验机制。默认管理员账号由环境变量 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 控制（参考 `.env.example`）。登录成功后返回的 `token` 需在有效期内通过 `Authorization: Bearer <token>` 头参与后续请求。
-
-### 登录
-
-**POST** `/auth/login`
-
-请求体：
-
-```json
-{
-  "username": "admin",
-  "password": "admin123456"
-}
-```
-
-成功响应：
-
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expires_at": "2024-06-01T12:30:00Z",
-  "user": {
-    "user_id": "2d8a8d41-1b0b-4d61-9d4c-bdd1c7d9c5c3",
-    "username": "admin",
-    "role": "admin"
-  }
-}
-```
-
-### 获取当前用户信息
-
-**GET** `/auth/me`
-
-头部：`Authorization: Bearer <token>`
-
-```json
-{
-  "user_id": "2d8a8d41-1b0b-4d61-9d4c-bdd1c7d9c5c3",
-  "username": "admin",
-  "role": "admin"
-}
-```
+为了简化体验，接口不再要求登录令牌，部署在受控网络环境中即可直接访问。
 
 ## 通用说明
 
 - Accept / Content-Type：`application/json`
 - 上传图片使用 `multipart/form-data`
 - 响应示例中的时间为 ISO 8601 字符串
-- 除健康检查外的业务接口均需携带 `Authorization: Bearer <token>` 请求头
+- 所有业务接口均可直接访问（部署时可结合反向代理或内网隔离进行保护）
 
 ## 健康检查
 
@@ -69,8 +28,6 @@
 ## 上传图像并触发分析
 
 **POST** `/uploads`
-
-头部：`Authorization: Bearer <token>`
 
 表单字段：
 - `file`：图像文件
@@ -105,8 +62,6 @@
 
 **GET** `/results`
 
-头部：`Authorization: Bearer <token>`
-
 查询参数：
 - `page` (可选，默认 `1`)
 - `limit` (可选，默认 `10`，最大 `100`)
@@ -140,8 +95,6 @@
 
 **GET** `/results/{upload_id}`
 
-头部：`Authorization: Bearer <token>`
-
 ```json
 {
   "upload_id": "0ac8c6c7-31d4-4b44-a683-6e1a5d7d1c36",
@@ -167,8 +120,6 @@
 ## 统计信息
 
 **GET** `/statistics`
-
-头部：`Authorization: Bearer <token>`
 
 返回当前系统的聚合数据。
 

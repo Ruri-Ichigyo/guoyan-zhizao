@@ -19,16 +19,28 @@ check_command() {
   fi
 }
 
+check_docker_compose() {
+  if ! docker compose version >/dev/null 2>&1; then
+    echo "docker compose 未找到，请先安装后再运行此脚本。"
+    exit 1
+  fi
+}
+
 banner
 
 check_command docker
-check_command "docker compose"
+check_docker_compose
 
 if [ ! -f .env ]; then
   echo "未发现 .env，正在从 .env.example 创建..."
   cp .env.example .env
   echo -e "${GREEN}✓ .env 已创建，可根据需要调整配置${RESET}"
 fi
+
+# 确保日志目录存在
+echo "检查日志目录..."
+mkdir -p logs/{ai,backend,frontend,postgres,redis}
+echo -e "${GREEN}✓ 日志目录已就绪${RESET}"
 
 echo "停止旧容器..."
 docker compose down --remove-orphans >/dev/null 2>&1 || true
@@ -76,8 +88,11 @@ printf "%-15s %s\n" "AI 服务" "http://localhost:8002/health"
 printf "%-15s %s\n" "PostgreSQL" "postgres://gyz:gyz123@localhost:5432/gyz"
 printf "%-15s %s\n" "Redis" "redis://localhost:6379"
 echo
+echo "日志目录: ./logs/"
+echo
 echo "常用命令:"
 printf "  %-30s %s\n" "查看服务状态" "docker compose ps"
 printf "  %-30s %s\n" "查看日志" "docker compose logs -f [service]"
+printf "  %-30s %s\n" "查看本地日志文件" "tail -f logs/[service]/*.log"
 printf "  %-30s %s\n" "停止所有服务" "docker compose down"
 echo

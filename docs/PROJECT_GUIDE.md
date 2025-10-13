@@ -15,16 +15,32 @@
 
 ## 2. 系统架构
 
-### 2.1 组件角色
+### 2.1 架构图
+
+为了更直观地理解系统各组件的交互关系，我们提供了详细的系统架构图。该图展示了从用户请求到数据处理、再到结果返回的完整流程。
+
+![系统架构图](../backend/uml-output/果蔬检测系统-架构图.png)
+
+**图解:**
+- **用户界面 (Vue 3)**: 作为系统的入口，负责图像上传和结果展示。
+- **后端 (Rust/Axum)**: 核心业务处理层，负责认证、文件存储、与 AI 服务和数据库的交互。
+- **AI 服务 (Python/FastAPI)**: 接收图像并执行分类推理，返回检测结果。
+- **数据存储**: 
+  - **PostgreSQL**: 持久化存储上传记录和检测结果。
+  - **Redis**: 作为热点数据缓存，加速查询响应。
+
+所有架构图（包括序列图、工作流图等）均通过 PlantUML 自动生成，源文件和详细说明请参阅 [backend/UML-DIAGRAMS-README.md](../backend/UML-DIAGRAMS-README.md)。
+
+### 2.2 组件角色
 | 模块 | 技术栈 | 关键职责 | 代码位置 |
 | --- | --- | --- | --- |
 | 前端 UI | Vue 3 + Element Plus + Vite | 上传任务、实时展示检测结果、历史查询与统计 | `frontend/` |
-| 接入后端 | Rust (Axum) | JWT 认证、校验与落盘上传文件、调用 AI 服务、写入数据库、提供 REST API | `backend/src/` |
+| 接入后端 | Rust (Axum) | 处理上传、调用 AI 服务、写入数据库、提供 REST API 与缓存 | `backend/src/` |
 | AI 推理服务 | FastAPI + PyTorch | 图像预处理、DenseNet121 推理、质量评估 | `ai/main.py` |
 | 缓存层 | Redis | 缓存单条检测结果 JSON，减少数据库压力 | 外部服务 |
 | 数据库 | PostgreSQL | 存储上传 binary、推理结果与统计字段 | 外部服务 |
 
-### 2.2 服务拓扑
+### 2.3 服务拓扑
 ```
 [Vue 前端] --REST--> [Axum 后端] --HTTP--> [FastAPI AI]
       |                      |                |
@@ -34,23 +50,20 @@
                              +--> PostgreSQL (uploads/results)
 ```
 
-### 2.3 核心流程
-1. 用户在登录页 (`frontend/src/views/LoginView.vue`) 输入账号密码，前端调用 `POST /api/v1/auth/login` 获取 JWT 并持久化至本地存储。
-2. 用户在前端 (`frontend/src/components/UploadPanel.vue`) 选择图片触发 `POST /api/v1/uploads`，请求头携带 `Authorization: Bearer <token>`。
-3. 后端 (`backend/src/routes/uploads.rs`) 校验 `multipart`，写入 `uploads` 表，并向 AI 服务发送推理请求。
-4. FastAPI (`ai/main.py`) 完成预处理、DenseNet121 推理与质量分级，返回结构化 JSON。
-5. 后端计算等级统计，写入 `results` 表，并将完整响应缓存到 Redis（键格式 `result:<upload_id>`）。
-6. 前端通过 `GET /api/v1/results`、`GET /api/v1/results/{id}`、`GET /api/v1/statistics` 展示历史记录与统计。
+### 2.4 核心流程
+1. 用户在上传组件 (`frontend/src/components/UploadPanel.vue`) 选择图片触发 `POST /api/v1/uploads`。
+2. 后端 (`backend/src/routes/uploads.rs`) 校验 `multipart`，写入 `uploads` 表，并向 AI 服务发送推理请求。
+3. FastAPI (`ai/main.py`) 完成预处理、DenseNet121 推理与质量分级，返回结构化 JSON。
+4. 后端计算等级统计，写入 `results` 表，并将完整响应缓存到 Redis（键格式 `result:<upload_id>`）。
+5. 前端通过 `GET /api/v1/results`、`GET /api/v1/results/{id}`、`GET /api/v1/statistics` 展示历史记录与统计。
 
 ## 3. 模块详解
 
 ### 3.1 Rust 后端 (`backend/`)
 - 入口：`src/main.rs`，初始化配置 `AppConfig`、数据库连接池、Redis 客户端与 AI Client。
 - 配置加载：`src/config.rs` 从环境变量读取数据库、Redis、AI 服务地址、缓存 TTL。
-- 数据访问：`src/db.rs` 在启动时自动建表（包含 `users` 表），并提供失败状态回写逻辑。
-- 认证与授权：`src/auth.rs` 提供 JWT 生成/校验、密码哈希、角色校验，`routes/auth.rs` 定义登录与当前用户接口。
+- 数据访问：`src/db.rs` 在启动时自动建表（`uploads`、`results`），并提供失败状态回写逻辑。
 - 业务路由：
-  - `routes/auth.rs`：登录、获取当前用户信息。
   - `routes/uploads.rs`：处理文件上传、调用 AI、写入结果、缓存响应。
   - `routes/results.rs`：支持分页过滤、详情查询（优先读取 Redis）。
   - `routes/statistics.rs`：聚合上传状态与平均置信度。
@@ -69,9 +82,8 @@
 
 ### 3.3 前端应用 (`frontend/`)
 - 技术栈：Vue 3 + TypeScript + Vite + Element Plus + Tailwind。
-- 入口文件 `src/main.ts`，路由定义 `src/router/index.ts`，`src/stores/` 目录预留给全局状态管理。
+- 入口文件 `src/main.ts`，路由定义 `src/router/index.ts`。
 - 主要页面：
-  - `LoginView.vue`：完成账号登录并存储访问令牌。
   - `HomeView.vue`：项目概览与快速入口。
   - `UploadPanel.vue`（嵌入上传页）：完成文件选择、上传反馈、最近结果展示。
   - `ResultsView.vue`：分页列表、筛选、详情抽屉，展示统计数据与历史记录。
@@ -96,16 +108,6 @@
   - `grade_a/grade_b/grade_c INTEGER`
   - `avg_confidence REAL`
   - `created_at TIMESTAMPTZ`
-- `users`
-  - `id UUID PRIMARY KEY`
-  - `username TEXT UNIQUE`
-  - `password_hash TEXT`（Argon2 哈希）
-  - `role TEXT`（`admin` / `operator` / `viewer`）
-  - `created_at TIMESTAMPTZ`
-
-> 应用启动时会调用 `ensure_default_user`，根据 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 初始化默认账户。
-
-
 ### 4.2 Redis 缓存策略
 - 键：`result:<upload_id>`。
 - 值：序列化后的 `UploadResponsePayload`（见 `backend/src/models.rs`）。
@@ -116,14 +118,13 @@
 ### 5.1 顶层 `.env`（参考 `.env.example`）
 - `DATABASE_URL` / `POSTGRES_*`：PostgreSQL 连接信息。
 - `REDIS_URL`、`CACHE_TTL_SECONDS`：缓存配置。
-- `BIND_ADDRESS`、`AI_SERVICE_URL`、`RUST_LOG`、`JWT_SECRET`、`JWT_TTL_SECONDS`：后端网络与认证配置。
-- `ADMIN_USERNAME`、`ADMIN_PASSWORD`、`ADMIN_ROLE`：初始化默认登录账号（服务启动时自动创建）。
+- `BIND_ADDRESS`、`AI_SERVICE_URL`、`RUST_LOG`：后端网络与日志配置。
 - `VITE_API_BASE_URL`、`VITE_APP_NAME` 等：前端构建时读取。
 - `DEV_*` 变量为 `scripts/dev-start.sh` 输出的本地开发建议值。
 
 ### 5.2 组件特定配置
 - 后端：
-  - `DATABASE_URL`、`REDIS_URL`、`AI_SERVICE_URL`、`CACHE_TTL_SECONDS`、`BIND_ADDRESS`、`JWT_SECRET`、`JWT_TTL_SECONDS`、`ADMIN_USERNAME`、`ADMIN_PASSWORD`、`ADMIN_ROLE`。
+  - `DATABASE_URL`、`REDIS_URL`、`AI_SERVICE_URL`、`CACHE_TTL_SECONDS`、`BIND_ADDRESS`。
 - AI 服务：
   - 默认为 CPU 推理，可通过 `CUDA_VISIBLE_DEVICES` 控制 GPU；模型文件位于 `ai/model/`。
 - 前端：
@@ -143,10 +144,6 @@
   export DATABASE_URL=postgres://gyz:gyz123@localhost:5432/gyz
   export REDIS_URL=redis://localhost:6379
   export AI_SERVICE_URL=http://localhost:8002
-  export JWT_SECRET=local-dev-secret           # 可选：覆盖 JWT 密钥
-  export JWT_TTL_SECONDS=3600                  # 可选：设置令牌有效期
-  export ADMIN_USERNAME=admin                  # 可选：默认账号
-  export ADMIN_PASSWORD=admin123456            # 可选：默认密码
   cargo run
   ```
 - AI 服务：

@@ -11,11 +11,6 @@ pub struct AppConfig {
     pub redis_url: String,
     pub ai_service_url: String,
     pub cache_ttl_seconds: u64,
-    pub jwt_secret: String,
-    pub jwt_ttl_seconds: i64,
-    pub admin_username: String,
-    pub admin_password: String,
-    pub admin_role: String,
 }
 
 impl AppConfig {
@@ -33,15 +28,6 @@ impl AppConfig {
             .ok()
             .and_then(|value| value.parse::<u64>().ok())
             .unwrap_or(DEFAULT_REDIS_TTL as u64);
-        let jwt_secret =
-            env::var("JWT_SECRET").unwrap_or_else(|_| "development-secret-change-me".into());
-        let jwt_ttl_seconds = env::var("JWT_TTL_SECONDS")
-            .ok()
-            .and_then(|value| value.parse::<i64>().ok())
-            .unwrap_or(3600);
-        let admin_username = env::var("ADMIN_USERNAME").unwrap_or_else(|_| "admin".into());
-        let admin_password = env::var("ADMIN_PASSWORD").unwrap_or_else(|_| "admin123456".into());
-        let admin_role = env::var("ADMIN_ROLE").unwrap_or_else(|_| "admin".into());
 
         Ok(Self {
             bind_address,
@@ -49,11 +35,6 @@ impl AppConfig {
             redis_url,
             ai_service_url,
             cache_ttl_seconds,
-            jwt_secret,
-            jwt_ttl_seconds,
-            admin_username,
-            admin_password,
-            admin_role,
         })
     }
 }

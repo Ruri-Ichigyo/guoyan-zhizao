@@ -1,7 +1,7 @@
 [project]
-name = "ai"
-version = "0.1.0"
-description = "Add your description here"
+name = "fruit-detection-service"
+version = "0.2.0"
+description = "Lightweight FastAPI service for loading DenseNet121-based fruit classification model and providing image inference API"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -14,4 +14,19 @@ dependencies = [
     "torch>=2.0.0",
     "torchvision>=0.15.0",
     "uvicorn>=0.23.0",
+]
+
+[project.scripts]
+fruit-detection = "app.api:app"
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
 ]
