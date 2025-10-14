@@ -24,14 +24,18 @@ const router = createRouter({
       component: () => import('../components/DataDashboard.vue')
     },
     {
+      path: '/records',
+      name: 'Records',
+      component: () => import('../views/RecordsView.vue')
+    },
+    // Legacy routes - redirect to unified records view
+    {
       path: '/results',
-      name: 'Results',
-      component: () => import('../views/ResultsView.vue')
+      redirect: '/records'
     },
     {
       path: '/detections',
-      name: 'Detections',
-      component: () => import('../views/DetectionsView.vue')
+      redirect: '/records'
     },
     {
       path: '/sort',

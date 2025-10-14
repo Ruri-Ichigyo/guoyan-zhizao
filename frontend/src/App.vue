@@ -25,12 +25,8 @@
               <el-icon><DataAnalysis /></el-icon>
               <span>数据大屏</span>
             </el-menu-item>
-            <el-menu-item index="/results">
+            <el-menu-item index="/records">
               <el-icon><List /></el-icon>
-              <span>结果查看</span>
-            </el-menu-item>
-            <el-menu-item index="/detections">
-              <el-icon><VideoCamera /></el-icon>
               <span>识别记录</span>
             </el-menu-item>
             <el-menu-item index="/sort">

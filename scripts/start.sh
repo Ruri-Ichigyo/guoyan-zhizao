@@ -85,8 +85,8 @@ echo
 printf "%-15s %s\n" "前端界面" "http://localhost:3000"
 printf "%-15s %s\n" "后端 API" "http://localhost:8080/api/v1"
 printf "%-15s %s\n" "AI 服务" "http://localhost:8002/health"
-printf "%-15s %s\n" "PostgreSQL" "postgres://gyz:gyz123@localhost:5432/gyz"
-printf "%-15s %s\n" "Redis" "redis://localhost:6379"
+printf "%-15s %s\n" "PostgreSQL" "postgres://gyz:nU1%2FzzGa@localhost:5432/gyz"
+printf "%-15s %s\n" "Redis" "redis://:6RQgSuJH@localhost:6379"
 echo
 echo "日志目录: ./logs/"
 echo

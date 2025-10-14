@@ -2,22 +2,35 @@
   <div
     class="home-container flex flex-col lg:flex-row items-center lg:items-start justify-center gap-12 lg:gap-16 p-8"
   >
-    <section class="hero-section text-center lg:text-left max-w-xl animate-fade-in">
-      <h1 class="system-title text-4xl lg:text-5xl font-extrabold text-green-700 mb-4">
+    <section
+      class="hero-section text-center lg:text-left max-w-xl animate-fade-in"
+    >
+      <h1
+        class="system-title text-4xl lg:text-5xl font-extrabold text-green-700 mb-4"
+      >
         果蔬智能分拣系统
       </h1>
-      <h2 class="welcome-title text-3xl lg:text-4xl font-bold text-gray-800 mb-4">
+      <h2
+        class="welcome-title text-3xl lg:text-4xl font-bold text-gray-800 mb-4"
+      >
         欢迎来到果蔬智能分拣系统
       </h2>
-      <p class="system-description text-lg lg:text-xl text-gray-700 mb-8 animate-slide-up">
+      <p
+        class="system-description text-lg lg:text-xl text-gray-700 mb-8 animate-slide-up"
+      >
         通过先进的图像识别和自动化技术，实现高效、精准的果蔬分拣。
       </p>
     </section>
 
     <section class="features-section w-full max-w-5xl">
-      <div class="features-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div
+        class="features-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+      >
         <!-- 第一行：3个卡片 -->
-        <div class="feature-card-custom animate-zoom-in" @click="goTo('/upload')">
+        <div
+          class="feature-card-custom animate-zoom-in"
+          @click="goTo('/upload')"
+        >
           <div class="card-content">
             <el-icon class="card-icon"><Upload /></el-icon>
             <h2 class="card-title">图像上传</h2>
@@ -25,7 +38,10 @@
           </div>
         </div>
 
-        <div class="feature-card-custom animate-zoom-in delay-100" @click="goTo('/camera')">
+        <div
+          class="feature-card-custom animate-zoom-in delay-100"
+          @click="goTo('/camera')"
+        >
           <div class="card-content">
             <el-icon class="card-icon"><Camera /></el-icon>
             <h2 class="card-title">实时摄像</h2>
@@ -33,7 +49,10 @@
           </div>
         </div>
 
-        <div class="feature-card-custom animate-zoom-in delay-200" @click="goTo('/dashboard')">
+        <div
+          class="feature-card-custom animate-zoom-in delay-200"
+          @click="goTo('/dashboard')"
+        >
           <div class="card-content">
             <el-icon class="card-icon"><DataAnalysis /></el-icon>
             <h2 class="card-title">数据大屏</h2>
@@ -41,24 +60,31 @@
           </div>
         </div>
 
-        <!-- 第二行：3个卡片 -->
+        <!--
         <div class="feature-card-custom animate-zoom-in delay-300" @click="goTo('/results')">
           <div class="card-content">
-            <el-icon class="card-icon"><List /></el-icon>
+            <el-icon class="card-chicon"><List /></el-icon>
             <h2 class="card-title">结果查看</h2>
             <p class="card-description">查看历史分拣结果</p>
           </div>
         </div>
+        -->
 
-        <div class="feature-card-custom animate-zoom-in delay-400" @click="goTo('/detections')">
+        <div
+          class="feature-card-custom animate-zoom-in delay-400"
+          @click="goTo('/detections')"
+        >
           <div class="card-content">
             <el-icon class="card-icon"><VideoCamera /></el-icon>
             <h2 class="card-title">识别记录</h2>
-            <p class="card-description">查看实时监控识别记录</p>
+            <p class="card-description">查看历史识别记录</p>
           </div>
         </div>
 
-        <div class="feature-card-custom animate-zoom-in delay-500" @click="goTo('/sort')">
+        <div
+          class="feature-card-custom animate-zoom-in delay-500"
+          @click="goTo('/sort')"
+        >
           <div class="card-content">
             <el-icon class="card-icon"><Operation /></el-icon>
             <h2 class="card-title">分拣控制</h2>
@@ -71,20 +97,29 @@
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
-import { Upload, Camera, DataAnalysis, List, VideoCamera, Operation } from '@element-plus/icons-vue' // Import necessary icons
+import { useRouter } from "vue-router";
+import {
+  Upload,
+  Camera,
+  DataAnalysis,
+  List,
+  VideoCamera,
+  Operation,
+} from "@element-plus/icons-vue"; // Import necessary icons
 
-const router = useRouter()
+const router = useRouter();
 
 const goTo = (path: string) => {
-  router.push(path)
-}
+  router.push(path);
+};
 </script>
 
 <style scoped>
 .home-container {
   /* No background here, handled by App.vue */
-  min-height: calc(100vh - 40px); /* Adjust for main-content-background margin */
+  min-height: calc(
+    100vh - 40px
+  ); /* Adjust for main-content-background margin */
   position: relative;
   z-index: 1; /* Ensure content is above background elements */
 }
@@ -120,7 +155,9 @@ const goTo = (path: string) => {
 
 .feature-card-custom {
   cursor: pointer;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
   border-radius: 12px; /* Slightly less rounded corners */
   background-color: var(--color-white); /* Solid white background */
   backdrop-filter: none; /* Remove backdrop filter */
@@ -177,8 +214,14 @@ const goTo = (path: string) => {
 
 /* Animations */
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .animate-fade-in {
   animation: fade-in 0.8s ease-out forwards;
@@ -189,8 +232,14 @@ const goTo = (path: string) => {
 }
 
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .animate-slide-up {
   animation: slide-up 0.8s ease-out forwards;
@@ -198,20 +247,40 @@ const goTo = (path: string) => {
 }
 
 @keyframes zoom-in {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .animate-zoom-in {
   animation: zoom-in 0.6s ease-out forwards;
 }
-.animate-zoom-in.delay-100 { animation-delay: 0.8s; }
-.animate-zoom-in.delay-200 { animation-delay: 1.0s; }
-.animate-zoom-in.delay-300 { animation-delay: 1.2s; }
-.animate-zoom-in.delay-400 { animation-delay: 1.4s; }
-.animate-zoom-in.delay-500 { animation-delay: 1.6s; }
+.animate-zoom-in.delay-100 {
+  animation-delay: 0.8s;
+}
+.animate-zoom-in.delay-200 {
+  animation-delay: 1s;
+}
+.animate-zoom-in.delay-300 {
+  animation-delay: 1.2s;
+}
+.animate-zoom-in.delay-400 {
+  animation-delay: 1.4s;
+}
+.animate-zoom-in.delay-500 {
+  animation-delay: 1.6s;
+}
 
 @keyframes rotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 </style>

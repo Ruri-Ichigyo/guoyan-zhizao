@@ -1,171 +1,461 @@
 # 果蔬智造核心平台
 
-轻量化保留核心功能的果蔬识别系统。平台聚焦于“图像上传 → AI 分析 → 结果查询”流程，采用 Rust 后端 + FastAPI AI 服务，Redis 作为热点缓存，PostgreSQL 负责持久化，前端使用 Vue 3 提供操作界面。
+轻量化保留核心功能的果蔬识别与质量分级系统。平台聚焦于"图像上传 → AI 分析 → 质量分级 → 结果查询"流程，采用 Rust 后端 + FastAPI AI 服务，Redis 作为热点缓存，PostgreSQL 负责持久化，前端使用 Vue 3 + Element Plus 提供现代化操作界面。
 
-## 架构速览
+## ✨ 核心功能
 
-| 组件 | 技术栈 | 说明 |
-| --- | --- | --- |
-| 前端 | Vue 3 + Element Plus | 图像上传、结果列表、检测详情 |
-| 后端 | Rust (Axum) | 统一接入层，存储上传文件、触发 AI 推理、暴露 REST API |
-| AI 服务 | Python (FastAPI + PyTorch) | 处理图像分类并返回检测结果 |
-| 缓存 | Redis | 缓存检测结果，提升查询性能 |
-| 数据库 | PostgreSQL | 存储上传记录、检测结果统计 |
+- 🍎 **智能识别**: 基于 DenseNet121 的果蔬分类，支持 60+ 品类
+- 📊 **质量分级**: A/B/C 三级质量评估系统（颜色、表面、新鲜度分析）
+- 📸 **多源接入**: 支持图像上传、实时摄像头、移动应用等多种数据来源
+- 📈 **统计分析**: 实时统计、数据可视化、历史记录查询
+- 🔄 **实时刷新**: 自动数据同步，30秒轮询 + 标签页切换刷新
+- 🗂️ **统一记录**: 融合上传记录与实时检测，提供统一查询接口
 
-## 快速上手
+## 🏗️ 架构速览
+
+| 组件 | 技术栈 | 端口 | 说明 |
+| --- | --- | --- | --- |
+| 前端 | Vue 3 + Element Plus + TypeScript | 3000 | 响应式界面、数据可视化、操作控制台 |
+| 后端 | Rust (Axum + SQLx) | 8080 | RESTful API、业务编排、数据持久化 |
+| AI 服务 | Python (FastAPI + PyTorch) | 8002 | 图像分类、质量评估、模型推理 |
+| 缓存 | Redis 7 | 6379 | 结果缓存、会话管理、性能优化 |
+| 数据库 | PostgreSQL 15 | 5432 | 数据持久化、关系管理、事务支持 |
+
+## 🚀 快速上手
 
 ### 1. 环境准备
 
+**系统要求**:
 - Docker Desktop / Docker Engine 20.10+
-- Docker Compose v2
+- Docker Compose v2+
+- 8GB+ 可用内存
+- 10GB+ 磁盘空间
+
+**一键启动**:
 
 ```bash
-# 如果没有 .env 文件，从示例创建
+# 克隆项目
+git clone <repository-url>
+cd guoyan-zhizao
+
+# 配置环境变量（可选，使用默认配置即可快速启动）
 cp .env.example .env
 
-# 使用启动脚本一键部署
+# 启动所有服务
 ./scripts/start.sh
+
+# 或使用 Docker Compose
+docker compose up -d
 ```
 
-脚本会完成镜像构建并启动以下服务：
+### 2. 服务访问
 
-- 前端：http://localhost:3000
-- 后端 API：http://localhost:8080/api/v1
-- AI 服务健康检查：http://localhost:8002/health
-- PostgreSQL：`postgres://gyz:gyz123@localhost:5432/gyz`
-- Redis：`redis://localhost:6379`
+启动完成后，可访问以下服务：
 
-查看运行状态：
+| 服务 | 地址 | 说明 |
+| --- | --- | --- |
+| 🌐 **前端界面** | http://localhost:3000 | Vue 3 应用主界面 |
+| 🔌 **后端 API** | http://localhost:8080/api/v1 | RESTful API 接口 |
+| 🤖 **AI 服务** | http://localhost:8002 | 推理服务（内部调用） |
+| 💾 **PostgreSQL** | localhost:5432 | 数据库（gyz/nU1/zzGa） |
+| 🗃️ **Redis** | localhost:6379 | 缓存服务（密码: 6RQgSuJH） |
 
-```bash
-docker compose ps
-docker compose logs -f backend
-```
-
-停止服务：
-
-```bash
-docker compose down
-```
-
-### 2. 本地开发
-
-使用 `./scripts/dev-start.sh` 可快速检查依赖并按需启动基础设施。主要服务开发流程：
-
-#### 后端 (Rust Axum)
-```bash
-cd backend
-export DATABASE_URL=postgres://gyz:gyz123@localhost:5432/gyz
-export REDIS_URL=redis://localhost:6379
-export AI_SERVICE_URL=http://localhost:8002
-# 可选：覆盖默认的 JWT 配置
-export JWT_SECRET=local-dev-secret
-export JWT_TTL_SECONDS=3600
-cargo run
-```
-
-#### AI 推理服务 (FastAPI)
-```bash
-cd ai
-python -m venv .venv && source .venv/bin/activate  # 可选
-pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8002
-```
-
-#### 前端 (Vue 3)
-```bash
-cd frontend
-npm install
-npm run dev
-# 开发代理默认指向 http://localhost:8080
-```
-
-### 3. 测试部署
-
-部署完成后，可以测试各个服务：
+### 3. 快速验证
 
 ```bash
 # 检查所有服务状态
 docker compose ps
 
-# 测试健康检查端点
-curl http://localhost:8002/health  # AI 服务
-curl http://localhost:8080/health  # 后端服务
-curl http://localhost:3000/health  # 前端服务
+# 健康检查
+curl http://localhost:8080/health     # 后端
+curl http://localhost:8002/health     # AI 服务
+curl http://localhost:3000/health     # 前端
 
-# 测试上传图片并识别
-curl -X POST http://localhost:8080/api/v1/uploads \
-  -F "file=@path/to/your/fruit-image.jpg"
-
-# 查看统计信息
+# 查看统计信息（包含测试数据）
 curl http://localhost:8080/api/v1/statistics
 
-# 查看结果列表
-curl http://localhost:8080/api/v1/results
+# 查看记录列表
+curl http://localhost:8080/api/v1/records?page=1&limit=10
+
+# 测试图片上传
+curl -X POST http://localhost:8080/api/v1/uploads \
+  -F "file=@path/to/fruit.jpg"
 ```
 
-### 4. 认证与默认账号
+### 4. 测试数据
 
-后端启用了基于 JWT 的认证流程。服务启动时会在数据库中确保存在一个默认管理员账号，便于首次登录：
+系统启动时自动加载测试数据：
+- **50+ 上传记录**: 包含各种状态（completed/processing/failed）
+- **30+ 实时检测**: 来自摄像头和移动应用的记录
+- **60+ 水果品类**: Apple、Banana、Orange、Grape 等
+- **完整统计**: 质量分级、置信度、时间分布
 
-- 默认用户名：`admin`
-- 默认密码：`admin123456`
+### 5. 本地开发模式
 
-可通过以下环境变量覆盖默认值：
-
-- `ADMIN_USERNAME`
-- `ADMIN_PASSWORD`
-- `ADMIN_ROLE`（默认为 `admin`）
-- `JWT_SECRET`（默认 `development-secret-change-me`，生产环境务必修改）
-- `JWT_TTL_SECONDS`（默认 3600 秒）
-
-**获取访问令牌示例**
+#### 后端开发 (Rust + Axum)
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123456"}'
+cd backend
+
+# 设置环境变量
+export DATABASE_URL="postgres://gyz:nU1%2FzzGa@localhost:5432/gyz"
+export REDIS_URL="redis://:6RQgSuJH@localhost:6379"
+export AI_SERVICE_URL="http://localhost:8002"
+export BIND_ADDRESS="0.0.0.0:8080"
+export RUST_LOG=info
+
+# 开发运行
+cargo run
+
+# 构建发布版本
+cargo build --release
+
+# 运行测试
+cargo test
 ```
 
-登录成功后，响应会包含 `token` 和 `expires_at` 字段，后续请求需在 `Authorization` 头中携带 `Bearer <token>`。前端应用会在登录页中请求该接口并在本地保存会话信息。
+#### AI 服务开发 (Python + FastAPI)
 
-## API 概要
+```bash
+cd ai
 
-**后端 API (http://localhost:8080)**
+# 使用 uv (推荐)
+uv sync
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8002
 
-- `POST /api/v1/uploads`：上传图片并返回检测结果（主要功能）
-- `GET /api/v1/results`：分页查询历史记录
-- `GET /api/v1/results/{id}`：获取单条检测详情
-- `GET /api/v1/statistics`：统计上传与识别概况
-- `GET /health`：后端服务健康检查
+# 或使用传统 pip
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8002
 
-**AI 服务 API (http://localhost:8002)**
-
-- `POST /infer`：图像推理接口（由后端调用）
-- `GET /health`：AI 服务健康检查
-- `GET /models`：列出所有已注册模型
-- `GET /metrics`：获取服务指标
-
-详细说明见 [docs/API.md](docs/API.md)。
-
-## 项目结构
-
-```
-.
-├── ai/            # FastAPI + PyTorch 推理服务
-├── backend/       # Rust 后端，负责数据存储与业务编排
-├── frontend/      # Vue 3 前端界面
-├── docs/          # 项目文档与部署、算法说明
-├── scripts/       # 辅助脚本（启动、环境验证等）
-├── docker-compose.yml
-└── .env.example   # 环境变量示例
+# 运行测试
+uv run pytest
 ```
 
-## 文档索引
-- [快速启动](docs/QUICKSTART.md)：部署与开发模式操作步骤
-- [项目指南](docs/PROJECT_GUIDE.md)：架构、模块与配置说明
-- [部署手册](docs/DEPLOY.md)：生产发布与运维建议
-- [API 参考](docs/API.md)：REST 接口定义与示例
-- [算法说明](docs/ALGORITHM.md)：模型训练与推理细节
-- [搭建核对](docs/SETUP_REPORT.md)：仓库结构与必备文件检查
-- [部署测试报告](DEPLOYMENT_REPORT.md)：最新部署和测试详情
+#### 前端开发 (Vue 3 + TypeScript)
+
+```bash
+cd frontend
+
+# 安装依赖
+npm install
+
+# 开发服务器（自动代理到 http://localhost:8080）
+npm run dev
+
+# 类型检查
+npm run type-check
+
+# 构建生产版本
+npm run build
+
+# 预览构建结果
+npm run preview
+```
+
+## 📡 API 概要
+
+### 后端 API (http://localhost:8080/api/v1)
+
+#### 核心接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/uploads` | 上传图片并触发 AI 分析 |
+| `GET` | `/records` | 统一记录查询（分页、筛选） |
+| `GET` | `/records/:id` | 获取单条记录详情 |
+| `GET` | `/records/:id/image` | 获取记录图片/快照 |
+| `DELETE` | `/records/:id` | 删除指定记录 |
+| `GET` | `/statistics` | 获取统计概览 |
+| `GET` | `/health` | 健康检查 |
+
+#### 兼容接口（向后兼容）
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/results` | 查询上传结果列表 |
+| `GET` | `/results/:id` | 获取单条上传结果 |
+| `GET` | `/detections` | 查询实时检测列表 |
+| `POST` | `/detections` | 创建实时检测记录 |
+| `GET` | `/detections/:id` | 获取单条检测记录 |
+| `GET` | `/detections/:id/snapshot` | 获取检测快照 |
+
+**查询参数示例**:
+
+```bash
+# 统一记录查询
+GET /api/v1/records?page=1&limit=20&source=upload&status=completed
+
+# source 可选值: all, upload, webcam, mobile
+# status 可选值: completed, processing, failed
+```
+
+### AI 服务 API (http://localhost:8002)
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/infer` | 图像推理（multipart/form-data） |
+| `GET` | `/health` | 健康检查 |
+| `GET` | `/models` | 列出所有模型 |
+| `GET` | `/models/:name` | 获取模型详情 |
+| `GET` | `/metrics` | 获取服务指标 |
+
+详细 API 文档: [docs/API.md](docs/API.md)
+
+## 📁 项目结构
+
+```
+guoyan-zhizao/
+├── frontend/                    # Vue 3 + TypeScript 前端
+│   ├── src/
+│   │   ├── api/                # API 接口封装
+│   │   │   ├── http.ts        # Axios 实例配置
+│   │   │   └── records.ts     # 统一记录 API
+│   │   ├── views/              # 页面组件
+│   │   │   ├── HomeView.vue   # 首页（上传+统计）
+│   │   │   └── RecordsView.vue # 记录查看（表格/卡片视图）
+│   │   ├── router/             # 路由配置
+│   │   ├── stores/             # Pinia 状态管理
+│   │   └── App.vue             # 根组件
+│   ├── public/                 # 静态资源
+│   ├── package.json            # 前端依赖
+│   ├── vite.config.ts          # Vite 配置
+│   └── Dockerfile              # 前端容器化配置
+│
+├── backend/                     # Rust + Axum 后端
+│   ├── src/
+│   │   ├── routes/             # API 路由
+│   │   │   ├── records.rs     # 统一记录接口 (NEW)
+│   │   │   ├── uploads.rs     # 图片上传
+│   │   │   ├── results.rs     # 结果查询
+│   │   │   ├── detections.rs  # 实时检测
+│   │   │   ├── statistics.rs  # 统计数据
+│   │   │   └── health.rs      # 健康检查
+│   │   ├── models.rs           # 数据模型
+│   │   ├── db.rs               # 数据库连接
+│   │   ├── cache.rs            # Redis 缓存
+│   │   ├── ai_client.rs        # AI 服务客户端
+│   │   ├── errors.rs           # 错误处理
+│   │   ├── config.rs           # 配置管理
+│   │   └── main.rs             # 应用入口
+│   ├── Cargo.toml              # Rust 依赖
+│   └── Dockerfile              # 后端容器化配置
+│
+├── ai/                          # Python + FastAPI AI 服务
+│   ├── app/                    # 应用代码
+│   │   ├── api.py             # FastAPI 路由
+│   │   ├── models.py          # DenseNet121 模型
+│   │   ├── service.py         # 推理服务
+│   │   ├── schemas.py         # 数据模型
+│   │   ├── config.py          # 配置管理
+│   │   ├── model_cache.py     # 模型缓存
+│   │   └── utils/             # 工具函数
+│   │       ├── preprocess.py  # 图像预处理
+│   │       └── postprocess.py # 质量评估
+│   ├── model/                  # 模型权重
+│   │   ├── fruit_densenet_weights.pth
+│   │   └── labels.json
+│   ├── tests/                  # 单元测试
+│   ├── pyproject.toml          # Python 项目配置
+│   ├── requirements.txt        # Python 依赖
+│   └── Dockerfile              # AI 服务容器化
+│
+├── init-db/                     # 数据库初始化脚本
+│   ├── 01-init-tables.sql      # 表结构
+│   └── 02-seed-test-data.sql   # 测试数据
+│
+├── docs/                        # 项目文档
+│   ├── API.md                  # API 接口文档
+│   ├── QUICKSTART.md           # 快速启动指南
+│   ├── PROJECT_GUIDE.md        # 项目开发指南
+│   ├── DEPLOY.md               # 部署手册
+│   └── ALGORITHM.md            # 算法说明
+│
+├── scripts/                     # 辅助脚本
+│   ├── start.sh                # 一键启动脚本
+│   └── verify-database.sh      # 数据库验证脚本
+│
+├── logs/                        # 日志目录（自动创建）
+│   ├── backend/
+│   ├── frontend/
+│   ├── ai/
+│   ├── postgres/
+│   └── redis/
+│
+├── docker-compose.yml           # Docker Compose 配置
+├── .env.example                 # 环境变量模板
+└── README.md                    # 项目说明（本文件）
+```
+
+## 📚 文档索引
+
+- **[API 参考](docs/API.md)** - 完整的 REST API 接口定义与示例
+- **[快速启动](docs/QUICKSTART.md)** - 部署流程、数据库配置、测试验证
+- **[项目指南](docs/PROJECT_GUIDE.md)** - 架构设计、模块说明、技术选型
+- **[部署手册](docs/DEPLOY.md)** - 生产环境部署、运维建议、性能优化
+- **[算法说明](docs/ALGORITHM.md)** - DenseNet121 模型、质量评估、训练细节
+- **[端口文档](docs/PORTS.md)** - 所有服务端口说明与访问方式
+- **[统一记录文档](docs/UNIFIED_RECORDS_COMPLETE.md)** - 统一记录 API 设计与实现
+
+## 🔧 常用命令
+
+### Docker Compose 管理
+
+```bash
+# 启动所有服务
+docker compose up -d
+
+# 查看服务状态
+docker compose ps
+
+# 查看实时日志
+docker compose logs -f
+
+# 查看特定服务日志
+docker compose logs -f backend
+docker compose logs -f ai
+
+# 重启服务
+docker compose restart backend
+
+# 停止服务
+docker compose down
+
+# 停止并删除所有数据（重新初始化）
+docker compose down -v
+
+# 重新构建镜像
+docker compose build --no-cache
+```
+
+### 数据库管理
+
+```bash
+# 连接到 PostgreSQL
+docker exec -it gyz-postgres psql -U gyz -d gyz
+
+# 查看表结构
+docker exec -it gyz-postgres psql -U gyz -d gyz -c "\dt"
+
+# 查询数据
+docker exec -it gyz-postgres psql -U gyz -d gyz -c "SELECT COUNT(*) FROM uploads;"
+
+# 执行 SQL 脚本
+docker exec -i gyz-postgres psql -U gyz -d gyz < init-db/01-init-tables.sql
+```
+
+### Redis 管理
+
+```bash
+# 连接到 Redis
+docker exec -it gyz-redis redis-cli -a 6RQgSuJH
+
+# 查看所有键
+docker exec -it gyz-redis redis-cli -a 6RQgSuJH keys "*"
+
+# 清空缓存
+docker exec -it gyz-redis redis-cli -a 6RQgSuJH FLUSHALL
+
+# 查看缓存统计
+docker exec -it gyz-redis redis-cli -a 6RQgSuJH INFO stats
+```
+
+## 🐛 故障排查
+
+### 服务无法启动
+
+```bash
+# 检查容器状态
+docker compose ps -a
+
+# 查看详细日志
+docker compose logs [service-name]
+
+# 检查端口占用
+netstat -tuln | grep -E "3000|8080|8002|5432|6379"
+
+# 清理并重新启动
+docker compose down -v
+docker compose up -d
+```
+
+### 数据库连接失败
+
+```bash
+# 验证数据库连接
+docker exec gyz-backend env | grep DATABASE_URL
+
+# 测试数据库连接
+docker exec -it gyz-postgres pg_isready -U gyz
+
+# 检查数据库日志
+docker compose logs postgres
+```
+
+### AI 服务推理失败
+
+```bash
+# 检查模型文件
+ls -lh ai/model/
+
+# 查看 AI 服务日志
+docker compose logs ai
+
+# 手动测试推理接口
+curl -X POST http://localhost:8002/infer \
+  -F "upload_id=test-001" \
+  -F "file=@test-image.jpg"
+```
+
+### 前端无法访问后端
+
+```bash
+# 检查代理配置
+cat frontend/vite.config.ts
+
+# 验证后端健康
+curl http://localhost:8080/health
+
+# 检查前端构建日志
+docker compose logs frontend
+```
+
+## 🚢 生产部署建议
+
+1. **环境变量**: 务必修改 `.env` 中的默认密码和密钥
+2. **数据备份**: 定期备份 PostgreSQL 数据和 Redis 持久化文件
+3. **日志管理**: 配置日志轮转，防止磁盘占满
+4. **监控告警**: 部署 Prometheus + Grafana 监控服务状态
+5. **反向代理**: 使用 Nginx/Caddy 作为前端代理，添加 SSL 证书
+6. **资源限制**: 在 `docker-compose.yml` 中配置内存和 CPU 限制
+7. **健康检查**: 利用 Docker 健康检查自动重启异常服务
+
+详见 [docs/DEPLOY.md](docs/DEPLOY.md)
+
+## 🤝 贡献指南
+
+欢迎贡献代码、报告问题或提出建议！
+
+1. Fork 本仓库
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
+
+## 📄 许可证
+
+详见项目许可证文件。
+
+## 📞 支持与反馈
+
+如遇问题或有建议，请通过以下方式联系：
+- 提交 Issue
+- 查看文档 [docs/](docs/)
+- 邮件联系项目维护者
+
+---
+
+**最后更新**: 2025-10-14
+**版本**: v0.3.0
+**作者**: 果蔬智造团队

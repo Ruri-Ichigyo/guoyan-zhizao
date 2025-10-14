@@ -231,3 +231,13 @@ node_modules
 .gemini
 .codex
 
+# Temporary test directories
+torch/
+torchvision/
+
+# Rust target directory
+backend/target/
+
+# Docker volumes
+postgres_data/
+redis_data/

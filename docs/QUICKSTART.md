@@ -1,98 +1,172 @@
 # 快速启动指南
 
-## 依赖要求
+## 修复内容总结
 
-### Docker 部署（推荐）
-- Docker Desktop / Docker Engine 20.10+
-- Docker Compose v2
+✅ **已修复 Redis 密码配置不一致问题**
+✅ **已修复 PostgreSQL 密码配置问题**
+✅ **已创建数据库初始化脚本（80条测试数据）**
+✅ **已验证端口映射配置**
 
-### 本地开发
-- Rust 1.75+ 与 Cargo
-- Python 3.10+
-- Node.js 18+
-- Docker（用于运行 PostgreSQL 与 Redis）
+## 快速开始
 
----
-
-## 方式一：Docker 一键启动
+### 1. 启动服务（全新初始化）
 
 ```bash
-cp .env.example .env
-./scripts/start.sh
+# 如果之前运行过，先清理旧数据
+docker compose down -v
+
+# 启动所有服务
+docker compose up -d
+
+# 查看启动日志
+docker compose logs -f
 ```
 
-脚本会依次：
-1. 构建 `postgres`、`redis`、`ai`、`backend`、`frontend` 镜像
-2. 启动所有服务并等待健康检查通过
+### 2. 验证配置
 
-启动完成后：
-- 前端：http://localhost:3000
-- 后端 API：http://localhost:8080/api/v1
-- AI 服务：http://localhost:8002/health
-- PostgreSQL：`postgres://gyz:gyz123@localhost:5432/gyz`
-- Redis：`redis://localhost:6379`
+运行自动验证脚本：
 
-常用命令：
 ```bash
+./verify-database.sh
+```
+
+该脚本会检查：
+- ✓ Docker 容器状态
+- ✓ 端口映射
+- ✓ PostgreSQL 连接和数据
+- ✓ Redis 连接和认证
+- ✓ 配置一致性
+- ✓ API 接口响应
+- ✓ 显示数据示例
+
+### 3. 手动验证（可选）
+
+#### 检查 PostgreSQL
+```bash
+docker exec -it gyz-postgres psql -U gyz -d gyz -c "SELECT COUNT(*) FROM uploads;"
+# 预期输出: 50
+
+docker exec -it gyz-postgres psql -U gyz -d gyz -c "SELECT status, COUNT(*) FROM uploads GROUP BY status;"
+```
+
+#### 检查 Redis
+```bash
+docker exec -it gyz-redis redis-cli -a 6RQgSuJH ping
+# 预期输出: PONG
+```
+
+#### 测试 API
+```bash
+# 健康检查
+curl http://localhost:8080/api/v1/health
+
+# 获取结果列表
+curl http://localhost:8080/api/v1/results?page=1&limit=10
+
+# 获取统计数据
+curl http://localhost:8080/api/v1/statistics
+```
+
+### 4. 访问应用
+
+- 前端界面: http://localhost:3000
+- API 文档: http://localhost:8080/api/v1
+
+## 测试数据说明
+
+### 上传记录（50条）
+- **文件名**: test_image_1.jpg ~ test_image_50.jpg
+- **状态分布**:
+  - 大部分: completed（已完成）
+  - 少数: processing（处理中）
+  - 少数: failed（失败）
+- **时间跨度**: 过去30天内随机分布
+
+### 检测结果
+- **水果类型**: 苹果、香蕉、橙子、葡萄、西瓜、草莓、樱桃、梨、桃子、芒果
+- **等级分布**: A/B/C 随机分布
+- **置信度**: 0.70 - 0.99
+- **每张图片**: 5-20个检测结果
+
+### 实时检测记录（30条）
+- **数据源**: live_camera, camera_1, camera_2, mobile_app
+- **时间跨度**: 过去7天内随机分布
+- **每条记录**: 3-10个检测物体
+
+## 配置文件位置
+
+- **Docker Compose**: [docker-compose.yml](docker-compose.yml)
+- **环境变量**: [.env](.env)
+- **初始化脚本**: [init-db/](init-db/)
+  - `01-init-tables.sql` - 创建表和索引
+  - `02-seed-test-data.sql` - 插入测试数据
+- **详细文档**: [DATABASE-SETUP.md](DATABASE-SETUP.md)
+
+## 服务端口
+
+| 服务 | 主机端口 | 容器端口 |
+|------|---------|---------|
+| PostgreSQL | 5432 | 5432 |
+| Redis | 6379 | 6379 |
+| Backend API | 8080 | 8080 |
+| Frontend | 3000 | 80 |
+| AI Service | 8002 | 8002 |
+
+## 常用命令
+
+```bash
+# 查看所有服务状态
 docker compose ps
-docker compose logs -f backend
+
+# 查看特定服务日志
+docker compose logs postgres
+docker compose logs redis
+docker compose logs backend
+
+# 重启服务
+docker compose restart backend
+
+# 停止所有服务
 docker compose down
+
+# 停止并删除数据（重新初始化）
+docker compose down -v
 ```
 
----
+## 故障排查
 
-## 方式二：本地开发模式
-
-### 1. 启动基础设施
-
+### 容器启动失败
 ```bash
-./scripts/dev-start.sh  # 或手动执行 docker compose up -d postgres redis
+# 查看详细日志
+docker compose logs [service-name]
+
+# 检查容器状态
+docker compose ps -a
 ```
 
-### 2. 后端服务（Rust）
+### 无法连接数据库
 ```bash
-cd backend
-export DATABASE_URL=postgres://gyz:gyz123@localhost:5432/gyz
-export REDIS_URL=redis://localhost:6379
-export AI_SERVICE_URL=http://localhost:8002
-cargo run
+# 检查网络
+docker network ls
+docker network inspect guoyan-zhizao_default
+
+# 检查环境变量
+docker exec gyz-backend env | grep -E 'DATABASE_URL|REDIS_URL'
 ```
 
-### 3. AI 服务（FastAPI）
+### 初始化脚本未执行
 ```bash
-cd ai
-python -m venv .venv && source .venv/bin/activate  # 可选
-pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8002
+# 完全重新初始化
+docker compose down -v
+docker volume prune -f
+docker compose up -d
 ```
 
-### 4. 前端（Vue 3）
-```bash
-cd frontend
-npm install
-npm run dev
-# 开发代理自动转发 /api/v1 到 http://localhost:8080
-```
+## 下一步
 
----
+1. ✅ 所有配置已修复并验证
+2. ✅ 测试数据已就绪
+3. 📝 可以开始前端开发和测试
+4. 📝 可以根据需要调整测试数据
 
-## 数据初始化
-
-首次启动会自动创建以下表结构：
-- `uploads`：存储原始文件及状态
-- `results`：存储检测详情和统计指标
-
-如需清空数据，可执行：
-```bash
-docker compose down -v  # 删除容器与卷
-```
-
----
-
-## 常见问题
-
-- **构建失败（Rust 依赖下载）**：确保网络可访问 crates.io；必要时配置国内镜像。
-- **AI 服务加载失败**：确认 `ai/model` 下存在权重文件与 `labels.json`。
-- **前端无法请求**：检查 `VITE_API_BASE_URL` 是否与后端地址一致。
-
-更多细节请参见 [README](../README.md) 与 [API 文档](API.md)。
+更多详细信息请参考 [DATABASE-SETUP.md](DATABASE-SETUP.md)

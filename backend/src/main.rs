@@ -21,6 +21,7 @@ use crate::{
     routes::{
         detections::{create_detection, get_detection, get_detection_snapshot, list_detections},
         health::health,
+        records::{delete_record, get_record, get_record_image, list_records},
         results::{get_result, list_results},
         statistics::statistics,
         uploads::upload_file,
@@ -59,7 +60,13 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/health", get(health))
+        // Upload endpoint
         .route("/api/v1/uploads", post(upload_file))
+        // Unified records endpoints (NEW)
+        .route("/api/v1/records", get(list_records))
+        .route("/api/v1/records/:id", get(get_record).delete(delete_record))
+        .route("/api/v1/records/:id/image", get(get_record_image))
+        // Legacy endpoints (for backward compatibility)
         .route("/api/v1/results", get(list_results))
         .route("/api/v1/results/:result_id", get(get_result))
         .route("/api/v1/statistics", get(statistics))
