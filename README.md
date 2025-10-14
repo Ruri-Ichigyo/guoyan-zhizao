@@ -10,14 +10,16 @@
 - 📈 **统计分析**: 实时统计、数据可视化、历史记录查询
 - 🔄 **实时刷新**: 自动数据同步，30秒轮询 + 标签页切换刷新
 - 🗂️ **统一记录**: 融合上传记录与实时检测，提供统一查询接口
+- 🤖 **AI 助手**: 智能聊天对话，支持自然语言查询数据库和识别统计
 
 ## 🏗️ 架构速览
 
 | 组件 | 技术栈 | 端口 | 说明 |
 | --- | --- | --- | --- |
-| 前端 | Vue 3 + Element Plus + TypeScript | 3000 | 响应式界面、数据可视化、操作控制台 |
-| 后端 | Rust (Axum + SQLx) | 8080 | RESTful API、业务编排、数据持久化 |
+| 前端 | Vue 3 + Element Plus + TypeScript | 3000 | 响应式界面、数据可视化、操作控制台、AI 聊天助手 |
+| 后端 | Rust (Axum + SQLx) | 8080 | RESTful API、业务编排、数据持久化、聊天服务 |
 | AI 服务 | Python (FastAPI + PyTorch) | 8002 | 图像分类、质量评估、模型推理 |
+| MCP 服务 | Node.js (Model Context Protocol) | - | 数据库查询代理、自然语言到 SQL 转换 |
 | 缓存 | Redis 7 | 6379 | 结果缓存、会话管理、性能优化 |
 | 数据库 | PostgreSQL 15 | 5432 | 数据持久化、关系管理、事务支持 |
 
@@ -168,6 +170,9 @@ npm run preview
 | `GET` | `/records/:id/image` | 获取记录图片/快照 |
 | `DELETE` | `/records/:id` | 删除指定记录 |
 | `GET` | `/statistics` | 获取统计概览 |
+| `POST` | `/chat/sessions` | 创建聊天会话 |
+| `POST` | `/chat/message` | 发送聊天消息（支持 AI 和 MCP 查询） |
+| `GET` | `/chat/history/:id` | 获取聊天历史 |
 | `GET` | `/health` | 健康检查 |
 
 #### 兼容接口（向后兼容）
@@ -211,7 +216,11 @@ guoyan-zhizao/
 │   ├── src/
 │   │   ├── api/                # API 接口封装
 │   │   │   ├── http.ts        # Axios 实例配置
-│   │   │   └── records.ts     # 统一记录 API
+│   │   │   ├── records.ts     # 统一记录 API
+│   │   │   └── chat.ts        # 聊天 API
+│   │   ├── components/         # 组件
+│   │   │   ├── ChatWidget.vue # AI 聊天助手组件
+│   │   │   └── ...            # 其他组件
 │   │   ├── views/              # 页面组件
 │   │   │   ├── HomeView.vue   # 首页（上传+统计）
 │   │   │   └── RecordsView.vue # 记录查看（表格/卡片视图）
@@ -226,12 +235,16 @@ guoyan-zhizao/
 ├── backend/                     # Rust + Axum 后端
 │   ├── src/
 │   │   ├── routes/             # API 路由
-│   │   │   ├── records.rs     # 统一记录接口 (NEW)
+│   │   │   ├── records.rs     # 统一记录接口
 │   │   │   ├── uploads.rs     # 图片上传
 │   │   │   ├── results.rs     # 结果查询
 │   │   │   ├── detections.rs  # 实时检测
 │   │   │   ├── statistics.rs  # 统计数据
+│   │   │   ├── chat.rs        # 聊天服务（NEW）
 │   │   │   └── health.rs      # 健康检查
+│   │   ├── services/           # 服务层
+│   │   │   ├── llm_client.rs  # LLM 客户端（NEW）
+│   │   │   └── mcp_client.rs  # MCP 客户端（NEW）
 │   │   ├── models.rs           # 数据模型
 │   │   ├── db.rs               # 数据库连接
 │   │   ├── cache.rs            # Redis 缓存
@@ -239,6 +252,7 @@ guoyan-zhizao/
 │   │   ├── errors.rs           # 错误处理
 │   │   ├── config.rs           # 配置管理
 │   │   └── main.rs             # 应用入口
+│   ├── migrations/             # 数据库迁移脚本
 │   ├── Cargo.toml              # Rust 依赖
 │   └── Dockerfile              # 后端容器化配置
 │
@@ -262,19 +276,23 @@ guoyan-zhizao/
 │   └── Dockerfile              # AI 服务容器化
 │
 ├── init-db/                     # 数据库初始化脚本
-│   ├── 01-init-tables.sql      # 表结构
+│   ├── 00-schema.sql           # 表结构
 │   └── 02-seed-test-data.sql   # 测试数据
 │
 ├── docs/                        # 项目文档
+│   ├── README.md               # 文档中心索引
 │   ├── API.md                  # API 接口文档
-│   ├── QUICKSTART.md           # 快速启动指南
 │   ├── PROJECT_GUIDE.md        # 项目开发指南
 │   ├── DEPLOY.md               # 部署手册
-│   └── ALGORITHM.md            # 算法说明
+│   ├── ALGORITHM.md            # 算法说明
+│   ├── PORTS.md                # 端口文档
+│   └── archive/                # 归档文档
+│       └── specifications/     # 项目规范文档归档
 │
 ├── scripts/                     # 辅助脚本
 │   ├── start.sh                # 一键启动脚本
-│   └── verify-database.sh      # 数据库验证脚本
+│   ├── verify-database.sh      # 数据库验证脚本
+│   └── verify-setup.sh         # 环境验证脚本
 │
 ├── logs/                        # 日志目录（自动创建）
 │   ├── backend/
@@ -284,19 +302,20 @@ guoyan-zhizao/
 │   └── redis/
 │
 ├── docker-compose.yml           # Docker Compose 配置
+├── mcp-config.json             # MCP 服务器配置
 ├── .env.example                 # 环境变量模板
 └── README.md                    # 项目说明（本文件）
 ```
 
 ## 📚 文档索引
 
+- **[文档中心](docs/README.md)** - 完整的文档导航和索引
 - **[API 参考](docs/API.md)** - 完整的 REST API 接口定义与示例
-- **[快速启动](docs/QUICKSTART.md)** - 部署流程、数据库配置、测试验证
 - **[项目指南](docs/PROJECT_GUIDE.md)** - 架构设计、模块说明、技术选型
 - **[部署手册](docs/DEPLOY.md)** - 生产环境部署、运维建议、性能优化
 - **[算法说明](docs/ALGORITHM.md)** - DenseNet121 模型、质量评估、训练细节
 - **[端口文档](docs/PORTS.md)** - 所有服务端口说明与访问方式
-- **[统一记录文档](docs/UNIFIED_RECORDS_COMPLETE.md)** - 统一记录 API 设计与实现
+- **[规范文档归档](docs/archive/specifications/)** - 项目开发过程的详细规格说明和设计文档
 
 ## 🔧 常用命令
 
@@ -457,5 +476,6 @@ docker compose logs frontend
 ---
 
 **最后更新**: 2025-10-14
-**版本**: v0.3.0
+**版本**: v1.0.0
 **作者**: 果蔬智造团队
+**状态**: 生产就绪
