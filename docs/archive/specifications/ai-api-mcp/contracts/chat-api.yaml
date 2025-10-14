@@ -1,0 +1,688 @@
+openapi: 3.0.3
+info:
+  title: AI Assistant Chat API
+  description: |
+    REST API endpoints for the AI Assistant Chat Module.
+    Enables users to interact with an intelligent AI assistant for querying
+    fruit/vegetable detection data and receiving insights.
+  version: 0.1.0
+  contact:
+    name: Development Team
+    email: dev@example.com
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+  - url: https://api.guoyan-zhizao.com/api/v1
+    description: Production server
+
+tags:
+  - name: sessions
+    description: Chat session management
+  - name: messages
+    description: Chat message operations
+  - name: health
+    description: Service health checks
+
+security:
+  - BearerAuth: []
+
+paths:
+  /chat/sessions:
+    post:
+      tags:
+        - sessions
+      summary: Create new chat session
+      description: |
+        Initiates a new conversation session for the authenticated user.
+        Returns a session ID to be used for all subsequent messages.
+      operationId: createChatSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 200
+                  description: Optional session title (auto-generated from first message if omitted)
+                  example: "询问识别数据"
+            examples:
+              withTitle:
+                summary: Session with custom title
+                value:
+                  title: "查询上周统计数据"
+              withoutTitle:
+                summary: Session without title (auto-generated)
+                value: {}
+      responses:
+        '201':
+          description: Session created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSession'
+              examples:
+                success:
+                  summary: Successful session creation
+                  value:
+                    session_id: "550e8400-e29b-41d4-a716-446655440000"
+                    title: null
+                    status: "active"
+                    created_at: "2025-10-14T10:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    get:
+      tags:
+        - sessions
+      summary: List user's chat sessions
+      description: |
+        Retrieves all chat sessions for the authenticated user.
+        Supports filtering by status and pagination.
+      operationId: listChatSessions
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, archived]
+          description: Filter by session status
+          example: active
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          description: Number of sessions to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of sessions to skip
+      responses:
+        '200':
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - sessions
+                  - total
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatSessionSummary'
+                  total:
+                    type: integer
+                    description: Total number of sessions matching filter
+                    example: 25
+              examples:
+                success:
+                  summary: User with multiple sessions
+                  value:
+                    sessions:
+                      - id: "550e8400-e29b-41d4-a716-446655440000"
+                        title: "询问A级水果数量"
+                        status: "active"
+                        last_message_at: "2025-10-14T10:45:00Z"
+                        message_count: 8
+                      - id: "660e8400-e29b-41d4-a716-446655440001"
+                        title: "查询历史记录"
+                        status: "inactive"
+                        last_message_at: "2025-10-13T15:20:00Z"
+                        message_count: 15
+                    total: 25
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /chat/sessions/{session_id}:
+    get:
+      tags:
+        - sessions
+      summary: Get session details
+      description: Retrieves details for a specific chat session
+      operationId: getChatSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSessionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - sessions
+      summary: Archive chat session
+      description: |
+        Archives a chat session (soft delete).
+        Messages are retained but session becomes read-only.
+      operationId: archiveChatSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '204':
+          description: Session archived successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /chat/message:
+    post:
+      tags:
+        - messages
+      summary: Send chat message
+      description: |
+        Sends a user message to the AI assistant.
+        The assistant processes the message, potentially queries the database via MCP,
+        and returns an intelligent response.
+      operationId: sendChatMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - session_id
+                - message
+              properties:
+                session_id:
+                  type: string
+                  format: uuid
+                  description: Target conversation session
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 10000
+                  description: User's message content
+                  example: "上周有多少个A级水果?"
+            examples:
+              simpleQuery:
+                summary: Simple question
+                value:
+                  session_id: "550e8400-e29b-41d4-a716-446655440000"
+                  message: "你好，我想了解一下识别情况"
+              databaseQuery:
+                summary: Question requiring database lookup
+                value:
+                  session_id: "550e8400-e29b-41d4-a716-446655440000"
+                  message: "上周有多少个A级水果?"
+      responses:
+        '200':
+          description: AI assistant response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessageResponse'
+              examples:
+                simpleResponse:
+                  summary: Response without database query
+                  value:
+                    message_id: "770e8400-e29b-41d4-a716-446655440002"
+                    role: "assistant"
+                    content: "您好！我可以帮您查询识别情况、统计数据等信息。请告诉我您想了解什么？"
+                    timestamp: "2025-10-14T10:30:05Z"
+                    metadata:
+                      mcp_query_executed: false
+                      input_tokens: 50
+                      output_tokens: 80
+                      response_time_ms: 1200
+                databaseQueryResponse:
+                  summary: Response with database query
+                  value:
+                    message_id: "880e8400-e29b-41d4-a716-446655440003"
+                    role: "assistant"
+                    content: "根据数据库查询，上周您识别了42个A级水果。"
+                    timestamp: "2025-10-14T10:35:10Z"
+                    metadata:
+                      mcp_query_executed: true
+                      mcp_query_text: "SELECT COUNT(*) FROM results WHERE grade_a > 0 AND created_at > NOW() - INTERVAL '7 days' AND user_id = $1"
+                      query_results_count: 1
+                      input_tokens: 150
+                      output_tokens: 200
+                      response_time_ms: 2400
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "SessionNotFound"
+                message: "Chat session 550e8400-e29b-41d4-a716-446655440000 does not exist"
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '503':
+          description: LLM service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "LLMServiceUnavailable"
+                message: "AI assistant is temporarily unavailable. Please try again later."
+
+  /chat/history/{session_id}:
+    get:
+      tags:
+        - messages
+      summary: Get conversation history
+      description: |
+        Retrieves message history for a specific session.
+        Supports pagination for long conversations.
+      operationId: getChatHistory
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of messages to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of messages to skip (for pagination)
+      responses:
+        '200':
+          description: Conversation history
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - session_id
+                  - messages
+                  - total
+                  - has_more
+                properties:
+                  session_id:
+                    type: string
+                    format: uuid
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatMessage'
+                  total:
+                    type: integer
+                    description: Total message count in session
+                  has_more:
+                    type: boolean
+                    description: Whether more messages exist beyond current page
+              examples:
+                conversation:
+                  summary: Typical conversation history
+                  value:
+                    session_id: "550e8400-e29b-41d4-a716-446655440000"
+                    messages:
+                      - id: "770e8400-e29b-41d4-a716-446655440002"
+                        role: "user"
+                        content: "上周有多少个A级水果?"
+                        created_at: "2025-10-14T10:30:00Z"
+                      - id: "880e8400-e29b-41d4-a716-446655440003"
+                        role: "assistant"
+                        content: "根据数据库查询,上周您识别了42个A级水果。"
+                        created_at: "2025-10-14T10:30:05Z"
+                    total: 8
+                    has_more: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /chat/messages/new:
+    get:
+      tags:
+        - messages
+      summary: Poll for new messages
+      description: |
+        Polls for new messages in a session since a specific message ID.
+        Used by frontend for HTTP polling to simulate real-time updates.
+        Returns empty array if no new messages.
+      operationId: pollNewMessages
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Session to poll
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        - name: after
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Last known message ID (return messages after this)
+          example: "880e8400-e29b-41d4-a716-446655440003"
+      responses:
+        '200':
+          description: New messages (may be empty array)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatMessage'
+              examples:
+                newMessages:
+                  summary: New messages available
+                  value:
+                    - id: "990e8400-e29b-41d4-a716-446655440004"
+                      role: "assistant"
+                      content: "还有其他问题吗?"
+                      created_at: "2025-10-14T10:32:00Z"
+                noNewMessages:
+                  summary: No new messages
+                  value: []
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /health:
+    get:
+      tags:
+        - health
+      summary: Chat service health check
+      description: Returns health status of chat service and dependencies
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                  dependencies:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        enum: [up, down]
+                      redis:
+                        type: string
+                        enum: [up, down]
+                      llm_api:
+                        type: string
+                        enum: [up, down]
+                      mcp_server:
+                        type: string
+                        enum: [up, down]
+                  timestamp:
+                    type: string
+                    format: date-time
+              examples:
+                healthy:
+                  summary: All services operational
+                  value:
+                    status: "healthy"
+                    dependencies:
+                      database: "up"
+                      redis: "up"
+                      llm_api: "up"
+                      mcp_server: "up"
+                    timestamp: "2025-10-14T10:30:00Z"
+                degraded:
+                  summary: MCP server down (non-critical)
+                  value:
+                    status: "degraded"
+                    dependencies:
+                      database: "up"
+                      redis: "up"
+                      llm_api: "up"
+                      mcp_server: "down"
+                    timestamp: "2025-10-14T10:30:00Z"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from existing authentication system
+
+  parameters:
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Chat session identifier
+      example: "550e8400-e29b-41d4-a716-446655440000"
+
+  schemas:
+    ChatSession:
+      type: object
+      required:
+        - session_id
+        - status
+        - created_at
+      properties:
+        session_id:
+          type: string
+          format: uuid
+          description: Unique session identifier
+        title:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: Session title (auto-generated or user-provided)
+        status:
+          type: string
+          enum: [active, inactive, archived]
+          description: Session state
+        created_at:
+          type: string
+          format: date-time
+          description: Session creation timestamp
+
+    ChatSessionSummary:
+      type: object
+      required:
+        - id
+        - status
+        - message_count
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, inactive, archived]
+        last_message_at:
+          type: string
+          format: date-time
+          description: Timestamp of most recent message
+        message_count:
+          type: integer
+          minimum: 0
+          description: Total messages in session
+
+    ChatSessionDetail:
+      allOf:
+        - $ref: '#/components/schemas/ChatSession'
+        - type: object
+          properties:
+            message_count:
+              type: integer
+              minimum: 0
+            last_message_at:
+              type: string
+              format: date-time
+              nullable: true
+
+    ChatMessage:
+      type: object
+      required:
+        - id
+        - role
+        - content
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant, system]
+          description: Message sender
+        content:
+          type: string
+          maxLength: 10000
+          description: Message text content
+        created_at:
+          type: string
+          format: date-time
+
+    ChatMessageResponse:
+      allOf:
+        - $ref: '#/components/schemas/ChatMessage'
+        - type: object
+          required:
+            - timestamp
+            - metadata
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+              description: Server timestamp when response generated
+            metadata:
+              $ref: '#/components/schemas/MessageMetadata'
+
+    MessageMetadata:
+      type: object
+      required:
+        - mcp_query_executed
+      properties:
+        mcp_query_executed:
+          type: boolean
+          description: Whether database query was performed
+        mcp_query_text:
+          type: string
+          description: SQL query executed (if mcp_query_executed=true)
+        query_results_count:
+          type: integer
+          description: Number of rows returned by query
+        input_tokens:
+          type: integer
+          description: Tokens in LLM request
+        output_tokens:
+          type: integer
+          description: Tokens in LLM response
+        response_time_ms:
+          type: integer
+          description: Total processing time in milliseconds
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error context (optional)
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "ValidationError"
+            message: "Message content exceeds maximum length of 10000 characters"
+
+    Unauthorized:
+      description: Authentication required or token invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Unauthorized"
+            message: "Valid JWT token required"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "NotFound"
+            message: "Chat session not found"
+
+    RateLimitExceeded:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "RateLimitExceeded"
+            message: "Maximum 20 messages per minute. Please try again later."
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying
+
+    InternalServerError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "InternalServerError"
+            message: "An unexpected error occurred. Please try again later."

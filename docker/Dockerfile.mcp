@@ -1,0 +1,23 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install MCP server and tools for healthcheck
+RUN npm install -g @modelcontextprotocol/server-postgres && \
+    apk add --no-cache procps
+
+# Copy configuration
+COPY mcp-config.json /app/config.json
+
+# Health check - verify the MCP server process is running
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD pgrep -f "server-postgres" || exit 1
+
+# Environment variables
+ENV NODE_ENV=production
+ENV MCP_CONFIG_PATH=/app/config.json
+ENV DATABASE_URL=postgresql://mcp_readonly:mcp_secure_pass_2025@postgres:5432/gyz
+
+# Start MCP server with database URL as argument
+# Using exec form with sh -c to properly expand environment variable
+CMD ["sh", "-c", "exec npx -y @modelcontextprotocol/server-postgres \"$DATABASE_URL\""]

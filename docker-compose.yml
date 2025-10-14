@@ -39,10 +39,10 @@ services:
     build:
       context: ./ai
       dockerfile: Dockerfile
-      # Uncomment the following lines if you need to use a proxy
-      # args:
-      #   - HTTP_PROXY=http://192.168.5.2:7897
-      #   - HTTPS_PROXY=http://192.168.5.2:7897
+    # Uncomment the following lines if you need to use a proxy
+    # args:
+    #   - HTTP_PROXY=http://192.168.5.2:7897
+    #   - HTTPS_PROXY=http://192.168.5.2:7897
     container_name: gyz-ai
     environment:
       - PYTHONUNBUFFERED=1
@@ -69,6 +69,10 @@ services:
       - DATABASE_URL=postgres://${POSTGRES_USER:-gyz}:nU1%2FzzGa@postgres:5432/${POSTGRES_DB:-gyz}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-6RQgSuJH}@redis:6379
       - AI_SERVICE_URL=http://ai:8002
+      - LLM_API_URL=${LLM_API_URL:-https://api.siliconflow.cn/v1/messages}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-Qwen/Qwen3-Coder-30B-A3B-Instruct}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-12800}
       - BIND_ADDRESS=0.0.0.0:8080
       - CACHE_TTL_SECONDS=900
     volumes:

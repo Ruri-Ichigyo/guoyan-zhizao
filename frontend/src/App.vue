@@ -69,6 +69,9 @@
       </el-container>
     </el-container>
 
+    <!-- Chat Widget (Global) -->
+    <ChatWidget />
+
     <!-- Settings Dialog -->
     <el-dialog v-model="showSettings" title="系统设置" width="600px">
       <el-form label-width="120px">
@@ -106,6 +109,7 @@ import {
   Apple, Monitor, Setting, Upload, Camera, DataAnalysis, List,
   Operation, VideoCamera, HomeFilled
 } from '@element-plus/icons-vue'
+import ChatWidget from './components/ChatWidget.vue'
 
 const router = useRouter()
 const jobStore = useJobStore()
