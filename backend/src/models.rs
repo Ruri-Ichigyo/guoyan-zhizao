@@ -5,6 +5,40 @@ use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+// ============================================================================
+// User Module Models
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct User {
+    pub id: Uuid,
+    pub username: String,
+    pub email: String,
+    #[serde(skip_serializing)]
+    pub password_hash: String,
+    pub full_name: Option<String>,
+    pub role: String, // 'admin', 'user', 'operator'
+    pub status: String, // 'active', 'inactive', 'suspended'
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub last_login_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserPublic {
+    pub id: Uuid,
+    pub username: String,
+    pub email: String,
+    pub full_name: Option<String>,
+    pub role: String,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+}
+
+// ============================================================================
+// Upload & Detection Module Models
+// ============================================================================
+
 // Custom deserializer for DateTime<Utc> that accepts naive datetime strings
 fn deserialize_datetime<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
 where
@@ -91,6 +125,7 @@ pub struct StatisticsResponse {
 #[derive(Debug, FromRow)]
 pub struct UploadRow {
     pub id: Uuid,
+    pub user_id: Option<Uuid>,
     pub filename: String,
     pub content_type: Option<String>,
     pub data: Vec<u8>,
@@ -144,6 +179,7 @@ pub struct DetailedRow {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct LiveDetection {
     pub id: Uuid,
+    pub user_id: Option<Uuid>,
     pub snapshot: Vec<u8>,
     pub labels: Vec<String>,
     pub confidence_scores: Vec<f32>,

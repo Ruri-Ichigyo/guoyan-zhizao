@@ -1,10 +1,64 @@
--- 插入测试数据
--- 注意：这里使用小的占位符字节数据，实际环境中应该是真实的图片数据
+-- =============================================================================
+-- 果蔬智造测试数据
+-- 创建时间: 2025-10-14
+-- 说明: 插入测试数据用于开发和测试
+-- =============================================================================
 
--- 插入50条上传记录和对应的检测结果
+-- =============================================================================
+-- 1. 插入测试用户
+-- =============================================================================
+DO $$
+DECLARE
+    v_admin_id UUID;
+    v_user1_id UUID;
+    v_user2_id UUID;
+BEGIN
+    -- 插入管理员用户
+    INSERT INTO users (id, username, email, password_hash, full_name, role, status)
+    VALUES (
+        gen_random_uuid(),
+        'admin',
+        'admin@guoyan.com',
+        '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYuPHZ1234',  -- password: admin123
+        '系统管理员',
+        'admin',
+        'active'
+    ) RETURNING id INTO v_admin_id;
+
+    -- 插入测试用户1
+    INSERT INTO users (id, username, email, password_hash, full_name, role, status)
+    VALUES (
+        gen_random_uuid(),
+        'zhangsan',
+        'zhangsan@example.com',
+        '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYuPHZ1234',  -- password: user123
+        '张三',
+        'user',
+        'active'
+    ) RETURNING id INTO v_user1_id;
+
+    -- 插入测试用户2
+    INSERT INTO users (id, username, email, password_hash, full_name, role, status)
+    VALUES (
+        gen_random_uuid(),
+        'lisi',
+        'lisi@example.com',
+        '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYuPHZ1234',  -- password: user123
+        '李四',
+        'operator',
+        'active'
+    ) RETURNING id INTO v_user2_id;
+
+    RAISE NOTICE '已创建测试用户: admin_id=%, user1_id=%, user2_id=%', v_admin_id, v_user1_id, v_user2_id;
+END $$;
+
+-- =============================================================================
+-- 2. 插入上传记录和检测结果
+-- =============================================================================
 DO $$
 DECLARE
     v_upload_id UUID;
+    v_user_id UUID;
     v_filename TEXT;
     v_status TEXT;
     v_total_fruits INTEGER;
@@ -22,10 +76,15 @@ DECLARE
     confidence REAL;
     grade TEXT;
     class_name TEXT;
+    user_ids UUID[];
 BEGIN
+    -- 获取所有用户ID
+    SELECT array_agg(id) INTO user_ids FROM users WHERE role != 'admin';
+
     -- 生成50条上传记录
     FOR i IN 1..50 LOOP
         v_upload_id := gen_random_uuid();
+        v_user_id := user_ids[1 + floor(random() * array_length(user_ids, 1))::INTEGER];
         v_filename := 'test_image_' || i || '.jpg';
         v_status := CASE
             WHEN i % 10 = 0 THEN 'failed'
@@ -86,9 +145,10 @@ BEGIN
         v_created_at := NOW() - (random() * INTERVAL '30 days');
 
         -- 插入上传记录（使用小的占位符数据）
-        INSERT INTO uploads (id, filename, content_type, data, status, created_at, updated_at)
+        INSERT INTO uploads (id, user_id, filename, content_type, data, status, created_at, updated_at)
         VALUES (
             v_upload_id,
+            v_user_id,
             v_filename,
             'image/jpeg',
             decode('FFD8FFE000104A46494600', 'hex'), -- JPEG 文件头占位符
@@ -115,9 +175,12 @@ BEGIN
     END LOOP;
 END $$;
 
--- 插入30条实时检测记录
+-- =============================================================================
+-- 3. 插入实时检测记录
+-- =============================================================================
 DO $$
 DECLARE
+    v_user_id UUID;
     v_labels TEXT[];
     v_confidence_scores REAL[];
     v_detected_classes TEXT[];
@@ -127,8 +190,15 @@ DECLARE
     det_count INTEGER;
     fruit_types TEXT[] := ARRAY['苹果', '香蕉', '橙子', '葡萄', '西瓜', '草莓', '樱桃', '梨', '桃子', '芒果'];
     sources TEXT[] := ARRAY['live_camera', 'camera_1', 'camera_2', 'mobile_app'];
+    user_ids UUID[];
 BEGIN
+    -- 获取所有用户ID
+    SELECT array_agg(id) INTO user_ids FROM users;
+
     FOR i IN 1..30 LOOP
+        -- 随机选择用户
+        v_user_id := user_ids[1 + floor(random() * array_length(user_ids, 1))::INTEGER];
+
         -- 随机生成检测到的物体数量（3-10个）
         det_count := 3 + floor(random() * 7)::INTEGER;
 
@@ -146,8 +216,9 @@ BEGIN
         v_created_at := NOW() - (random() * INTERVAL '7 days');
 
         -- 插入实时检测记录
-        INSERT INTO detections (snapshot, labels, confidence_scores, detected_classes, created_at, source)
+        INSERT INTO detections (user_id, snapshot, labels, confidence_scores, detected_classes, created_at, source)
         VALUES (
+            v_user_id,
             decode('FFD8FFE000104A46494600', 'hex'), -- JPEG 文件头占位符
             v_labels,
             v_confidence_scores,
@@ -158,20 +229,84 @@ BEGIN
     END LOOP;
 END $$;
 
--- 输出统计信息
+-- =============================================================================
+-- 4. 插入聊天会话和消息
+-- =============================================================================
 DO $$
 DECLARE
+    v_session_id UUID;
+    v_user_id UUID;
+    user_ids UUID[];
+    i INTEGER;
+    j INTEGER;
+    message_count INTEGER;
+BEGIN
+    -- 获取所有非管理员用户ID
+    SELECT array_agg(id) INTO user_ids FROM users WHERE role != 'admin';
+
+    -- 为每个用户创建2-3个会话
+    FOREACH v_user_id IN ARRAY user_ids LOOP
+        FOR i IN 1..2 LOOP
+            v_session_id := gen_random_uuid();
+
+            -- 插入会话
+            INSERT INTO chat_sessions (id, user_id, title, status, created_at, updated_at)
+            VALUES (
+                v_session_id,
+                v_user_id,
+                CASE i
+                    WHEN 1 THEN '如何提高识别准确率？'
+                    WHEN 2 THEN '查询最近的检测记录'
+                    ELSE '水果分级标准咨询'
+                END,
+                'active',
+                NOW() - (random() * INTERVAL '7 days'),
+                NOW() - (random() * INTERVAL '1 day')
+            );
+
+            -- 为每个会话插入3-8条消息
+            message_count := 3 + floor(random() * 5)::INTEGER;
+            FOR j IN 1..message_count LOOP
+                INSERT INTO chat_messages (session_id, role, content, created_at)
+                VALUES (
+                    v_session_id,
+                    CASE j % 2 WHEN 1 THEN 'user' ELSE 'assistant' END,
+                    CASE j % 2
+                        WHEN 1 THEN '用户问题 ' || j || ': 请帮我查询...'
+                        ELSE 'AI回复 ' || j || ': 根据查询结果...'
+                    END,
+                    NOW() - (random() * INTERVAL '7 days') + (j * INTERVAL '5 minutes')
+                );
+            END LOOP;
+        END LOOP;
+    END LOOP;
+END $$;
+
+-- =============================================================================
+-- 5. 统计信息
+-- =============================================================================
+DO $$
+DECLARE
+    user_count INTEGER;
     upload_count INTEGER;
     result_count INTEGER;
     detection_count INTEGER;
+    session_count INTEGER;
+    message_count INTEGER;
 BEGIN
+    SELECT COUNT(*) INTO user_count FROM users;
     SELECT COUNT(*) INTO upload_count FROM uploads;
     SELECT COUNT(*) INTO result_count FROM results;
     SELECT COUNT(*) INTO detection_count FROM detections;
+    SELECT COUNT(*) INTO session_count FROM chat_sessions;
+    SELECT COUNT(*) INTO message_count FROM chat_messages;
 
     RAISE NOTICE '=== 数据库初始化完成 ===';
+    RAISE NOTICE '用户数: %', user_count;
     RAISE NOTICE '上传记录数: %', upload_count;
     RAISE NOTICE '检测结果数: %', result_count;
     RAISE NOTICE '实时检测数: %', detection_count;
+    RAISE NOTICE '聊天会话数: %', session_count;
+    RAISE NOTICE '聊天消息数: %', message_count;
     RAISE NOTICE '========================';
 END $$;

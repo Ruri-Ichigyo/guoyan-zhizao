@@ -31,8 +31,12 @@ pub async fn create_session(
     State(state): State<AppState>,
     Json(req): Json<CreateSessionRequest>,
 ) -> Result<Json<CreateSessionResponse>, AppError> {
-    // TODO: Extract user_id from JWT token (for now using a mock UUID)
-    let user_id = Uuid::new_v4(); // This should come from authentication middleware
+    // TODO: Extract user_id from JWT token
+    // For now, get the first available user from database (demo mode)
+    let user_id: Uuid = sqlx::query_scalar("SELECT id FROM users WHERE role != 'admin' LIMIT 1")
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|_| AppError::Validation("No user found. Please create a user first.".to_string()))?;
 
     let session_id = Uuid::new_v4();
     let now = chrono::Utc::now();
@@ -81,7 +85,11 @@ pub async fn list_sessions(
     Query(query): Query<ListSessionsQuery>,
 ) -> Result<Json<ListSessionsResponse>, AppError> {
     // TODO: Extract user_id from JWT token
-    let user_id = Uuid::new_v4();
+    // For now, get the first available user from database (demo mode)
+    let user_id: Uuid = sqlx::query_scalar("SELECT id FROM users WHERE role != 'admin' LIMIT 1")
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|_| AppError::Validation("No user found. Please create a user first.".to_string()))?;
 
     let mut sql = "SELECT * FROM chat_sessions WHERE user_id = $1".to_string();
 
@@ -137,9 +145,11 @@ pub async fn send_message(
     Json(req): Json<SendMessageRequest>,
 ) -> Result<Json<SendMessageResponse>, AppError> {
     // TODO: Extract user_id from JWT token
-    // For now, use a fixed demo user ID
-    let user_id = Uuid::parse_str("00000000-0000-0000-0000-000000000001")
-        .expect("Valid UUID");
+    // For now, get the first available user from database (demo mode)
+    let user_id: Uuid = sqlx::query_scalar("SELECT id FROM users WHERE role != 'admin' LIMIT 1")
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|_| AppError::Validation("No user found. Please create a user first.".to_string()))?;
 
     // Verify session exists, or create if it doesn't
     let session: ChatSession = match sqlx::query_as("SELECT * FROM chat_sessions WHERE id = $1")

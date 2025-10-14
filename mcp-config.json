@@ -2,8 +2,8 @@
   "name": "guoyan-zhizao-mcp",
   "version": "1.0.0",
   "database": {
-    "connectionString": "postgresql://mcp_readonly:piLYG16p@localhost:5432/gyz",
-    "allowedTables": ["uploads", "results"],
+    "connectionString": "postgresql://mcp_readonly:mcp_secure_pass_2025@localhost:5432/gyz",
+    "allowedTables": ["users", "uploads", "results", "detections", "chat_sessions", "chat_messages"],
     "maxRowsPerQuery": 1000,
     "queryTimeoutMs": 5000
   },
