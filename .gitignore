@@ -241,3 +241,4 @@ backend/target/
 # Docker volumes
 postgres_data/
 redis_data/
+.cache_ggshield
