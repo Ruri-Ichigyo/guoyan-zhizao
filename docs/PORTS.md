@@ -6,11 +6,13 @@
 
 | 服务名称 | 容器名称 | 主机端口 | 容器端口 | 协议 | 访问方式 | 说明 |
 |---------|---------|---------|---------|------|---------|------|
-| **前端** | gyz-frontend | 3000 | 80 | HTTP | 浏览器/HTTP客户端 | Vue 3 应用（Nginx 托管） |
-| **后端 API** | gyz-backend | 8080 | 8080 | HTTP | HTTP客户端/前端 | Rust Axum RESTful API |
-| **AI 服务** | gyz-ai | 8002 | 8002 | HTTP | 内部调用（后端） | FastAPI 推理服务 |
-| **PostgreSQL** | gyz-postgres | 5432 | 5432 | TCP | psql/JDBC | 主数据库 |
-| **Redis** | gyz-redis | 6379 | 6379 | TCP | redis-cli | 缓存服务 |
+| **前端** | gyz-frontend | 3000 | 80 | HTTP | 浏览器/HTTP客户端 | Vue 3 应用（Nginx 托管）+ AI 聊天界面 |
+| **后端 API** | gyz-backend | 8080 | 8080 | HTTP | HTTP客户端/前端 | Rust Axum RESTful API + 聊天服务 + MCP |
+| **AI 服务** | gyz-ai | 8002 | 8002 | HTTP | 内部调用（后端） | FastAPI 推理服务 + 多模型支持 |
+| **PostgreSQL** | gyz-postgres | 5432 | 5432 | TCP | psql/JDBC | 主数据库（含聊天表） |
+| **Redis** | gyz-redis | 6379 | 6379 | TCP | redis-cli | 缓存服务（结果+会话+聊天历史） |
+
+**注意**: MCP 服务已集成到后端（gyz-backend），无需独立端口。
 
 ---
 
@@ -80,24 +82,36 @@ VITE_API_BASE_URL=/api/v1
 |------|------|------|
 | `/health` | GET | 健康检查 |
 | `/api/v1/uploads` | POST | 上传图片 |
-| `/api/v1/records` | GET | 查询记录 |
+| `/api/v1/records` | GET | 统一记录查询（上传+检测） |
 | `/api/v1/records/:id` | GET/DELETE | 记录详情/删除 |
 | `/api/v1/records/:id/image` | GET | 获取图片 |
 | `/api/v1/statistics` | GET | 统计数据 |
+| `/api/v1/detections` | POST/GET | 实时检测记录 |
+| `/api/v1/chat/sessions` | POST/GET | 聊天会话管理 |
+| `/api/v1/chat/message` | POST | 发送聊天消息 |
+| `/api/v1/chat/history/:id` | GET | 聊天历史 |
 
 #### 环境变量
 
 ```bash
+# 基础配置
 RUST_LOG=info
 DATABASE_URL=postgres://gyz:nU1%2FzzGa@postgres:5432/gyz
 REDIS_URL=redis://:6RQgSuJH@redis:6379
 AI_SERVICE_URL=http://ai:8002
 BIND_ADDRESS=0.0.0.0:8080
 CACHE_TTL_SECONDS=900
+
+# LLM 配置（聊天功能）
+LLM_API_URL=https://api.siliconflow.cn/v1/messages
+LLM_API_KEY=your-api-key-here
+LLM_MODEL=Qwen/Qwen3-Coder-30B-A3B-Instruct
+LLM_MAX_TOKENS=12800
 ```
 
 **重要提示**:
 - `DATABASE_URL` 中的特殊字符需要 URL 编码（`/` → `%2F`）
+- `LLM_API_KEY` 必须配置才能使用聊天功能
 - 容器内网络使用服务名称（`postgres`, `redis`, `ai`）而非 localhost
 
 #### 网络连接
@@ -603,6 +617,7 @@ server {
 
 ---
 
-**最后更新**: 2025-10-14
+**最后更新**: 2025-10-15  
+**版本**: v1.1.0
 **文档版本**: v1.0
 **维护**: 果蔬智造团队

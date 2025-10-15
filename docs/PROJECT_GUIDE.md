@@ -34,101 +34,216 @@
 ### 2.2 组件角色
 | 模块 | 技术栈 | 关键职责 | 代码位置 |
 | --- | --- | --- | --- |
-| 前端 UI | Vue 3 + Element Plus + Vite | 上传任务、实时展示检测结果、历史查询与统计 | `frontend/` |
-| 接入后端 | Rust (Axum) | 处理上传、调用 AI 服务、写入数据库、提供 REST API 与缓存 | `backend/src/` |
-| AI 推理服务 | FastAPI + PyTorch | 图像预处理、DenseNet121 推理、质量评估 | `ai/main.py` |
-| 缓存层 | Redis | 缓存单条检测结果 JSON，减少数据库压力 | 外部服务 |
-| 数据库 | PostgreSQL | 存储上传 binary、推理结果与统计字段 | 外部服务 |
+| 前端 UI | Vue 3 + Element Plus + Vite | 上传任务、实时展示检测结果、历史查询与统计、AI 聊天界面 | `frontend/` |
+| 接入后端 | Rust (Axum) | 处理上传、调用 AI 服务、写入数据库、提供 REST API、聊天服务、MCP 集成 | `backend/src/` |
+| AI 推理服务 | FastAPI + PyTorch | 图像预处理、DenseNet121 推理、质量评估 | `ai/app/` |
+| 聊天服务 | Rust (内置) | LLM 集成、MCP 协议实现、工具调用、会话管理 | `backend/src/services/` |
+| 缓存层 | Redis | 缓存检测结果、聊天历史、会话数据，减少数据库压力 | 外部服务 |
+| 数据库 | PostgreSQL | 存储上传、推理结果、聊天会话、用户信息 | 外部服务 |
 
 ### 2.3 服务拓扑
 ```
 [Vue 前端] --REST--> [Axum 后端] --HTTP--> [FastAPI AI]
       |                      |                |
       |                      |                +--> 模型权重 / 质量评估
-      |                      +--> Redis 缓存 ←+
-      +--> 静态资源         |
-                             +--> PostgreSQL (uploads/results)
+      |                      |
+      |                      +--> LLM API (SiliconFlow/Claude)
+      |                      |
+      |                      +--> Redis 缓存 (结果 + 聊天历史)
+      |                      |
+      +--> 静态资源          +--> PostgreSQL (uploads/results/chat)
+                             |         ↑
+                             +--> MCP 查询
 ```
 
 ### 2.4 核心流程
+
+#### 图像识别流程
 1. 用户在上传组件 (`frontend/src/components/UploadPanel.vue`) 选择图片触发 `POST /api/v1/uploads`。
 2. 后端 (`backend/src/routes/uploads.rs`) 校验 `multipart`，写入 `uploads` 表，并向 AI 服务发送推理请求。
-3. FastAPI (`ai/main.py`) 完成预处理、DenseNet121 推理与质量分级，返回结构化 JSON。
+3. FastAPI (`ai/app/api.py`) 完成预处理、DenseNet121 推理与质量分级，返回结构化 JSON。
 4. 后端计算等级统计，写入 `results` 表，并将完整响应缓存到 Redis（键格式 `result:<upload_id>`）。
-5. 前端通过 `GET /api/v1/results`、`GET /api/v1/results/{id}`、`GET /api/v1/statistics` 展示历史记录与统计。
+5. 前端通过 `GET /api/v1/records`、`GET /api/v1/records/{id}` 展示历史记录与统计。
+
+#### AI 聊天流程
+1. 用户在聊天组件 (`frontend/src/components/ChatWidget.vue`) 创建会话或发送消息。
+2. 后端 (`backend/src/routes/chat.rs`) 接收消息，调用 LLM 服务 (`services/llm_client.rs`)。
+3. LLM 决定是否需要工具调用（如数据库查询），通过 MCP 客户端 (`services/mcp_client.rs`) 执行。
+4. MCP 客户端使用 SQLx 直接查询 PostgreSQL，返回结构化数据。
+5. LLM 基于工具输出生成最终回复，后端存储消息到 `chat_messages` 表并缓存到 Redis。
+6. 前端通过轮询 (`GET /api/v1/chat/messages/new`) 或长轮询获取新消息。
 
 ## 3. 模块详解
 
 ### 3.1 Rust 后端 (`backend/`)
-- 入口：`src/main.rs`，初始化配置 `AppConfig`、数据库连接池、Redis 客户端与 AI Client。
-- 配置加载：`src/config.rs` 从环境变量读取数据库、Redis、AI 服务地址、缓存 TTL。
-- 数据访问：`src/db.rs` 在启动时自动建表（`uploads`、`results`），并提供失败状态回写逻辑。
-- 业务路由：
+- **入口**：`src/main.rs`，初始化配置 `AppConfig`、数据库连接池、Redis 客户端、AI Client、LLM Client 和 MCP Client。
+- **配置加载**：`src/config.rs` 从环境变量读取数据库、Redis、AI 服务、LLM API 地址和密钥。
+- **数据访问**：`src/db.rs` 在启动时自动建表（`uploads`、`results`、`detections`、`chat_sessions`、`chat_messages`、`users`）。
+- **业务路由**：
   - `routes/uploads.rs`：处理文件上传、调用 AI、写入结果、缓存响应。
-  - `routes/results.rs`：支持分页过滤、详情查询（优先读取 Redis）。
-  - `routes/statistics.rs`：聚合上传状态与平均置信度。
+  - `routes/records.rs`：统一记录 API，支持上传和实时检测记录的统一查询。
+  - `routes/results.rs`：遗留端点，向后兼容。
+  - `routes/detections.rs`：实时检测记录的创建和查询。
+  - `routes/statistics.rs`：聚合上传状态、质量分级、类别分布统计。
+  - `routes/chat.rs`：聊天会话管理、消息发送、历史查询、新消息轮询。
   - `routes/health.rs`：返回健康检查。
-- 错误与模型定义：`src/errors.rs` 统一错误类型，`src/models.rs` 描述数据库行、API 响应与缓存结构。
-- 对外 API 列表参见 `docs/API.md`。
+- **服务层**：
+  - `services/llm_client.rs`：LLM API 客户端，支持工具调用和流式响应。
+  - `services/mcp_client.rs`：MCP 协议实现，直接使用 SQLx 查询数据库。
+  - `ai_client.rs`：AI 推理服务 HTTP 客户端。
+- **缓存层**：`src/cache.rs` 提供 Redis 缓存工具函数，支持结果缓存、会话缓存、聊天历史缓存。
+- **错误与模型定义**：`src/errors.rs` 统一错误类型，`src/models.rs` 描述数据库行、API 响应与缓存结构。
+- **对外 API 列表**参见 `docs/API.md`。
 
 ### 3.2 AI 推理服务 (`ai/`)
-- 核心类 `FruitDetectionService`（`main.py`），在启动时加载 `model/labels.json` 与 `fruit_densenet_weights.pth`（若缺失则退回 ImageNet 预训练头）。
-- 图像预处理：`utils/preprocess.py`（调整尺寸、归一化），推理后使用 `torch.topk` 选取 Top-K 结果。
-- 质量评估：`utils/postprocess.py` 根据颜色均匀度、纹理、面积及置信度综合打分，转换为 `A/B/C`。
-- FastAPI 端点：
+- **核心类**：`FruitDetectionService`（`app/service.py`），在启动时加载模型注册表。
+- **模型管理**：
+  - `app/model_registry.py`：管理多模型支持，支持动态加载。
+  - `app/model_metadata.py`：模型元数据管理（版本、类别数、设备信息）。
+  - `app/model_cache.py`：模型权重缓存，避免重复加载。
+- **图像处理**：
+  - `app/utils/preprocess.py`：图像预处理（调整尺寸、归一化）。
+  - `app/utils/postprocess.py`：质量评估（颜色均匀度、纹理、面积、新鲜度）。
+- **FastAPI 端点**（`app/api.py`）：
   - `GET /health`：健康检查。
-  - `POST /infer`：接受 `upload_id` + 文件字节，返回推理结果（`InferenceResponse`）。
-- 更详细的算法与训练流程见 `docs/ALGORITHM.md`，训练脚本位于 `ai/train.py`。
+  - `GET /models`：列出所有可用模型。
+  - `GET /models/{model_name}`：获取特定模型信息。
+  - `POST /infer`：执行推理，接受 `upload_id`、`file` 和可选的 `model_name`。
+- **配置与日志**：
+  - `app/config.py`：从环境变量读取配置。
+  - `app/logging_config.py`：结构化日志配置。
+- **更详细的算法与训练流程**见 `docs/ALGORITHM.md`。
 
 ### 3.3 前端应用 (`frontend/`)
-- 技术栈：Vue 3 + TypeScript + Vite + Element Plus + Tailwind。
-- 入口文件 `src/main.ts`，路由定义 `src/router/index.ts`。
-- 主要页面：
-  - `HomeView.vue`：项目概览与快速入口。
-  - `UploadPanel.vue`（嵌入上传页）：完成文件选择、上传反馈、最近结果展示。
-  - `ResultsView.vue`：分页列表、筛选、详情抽屉，展示统计数据与历史记录。
-- API 封装：`src/api/upload.ts`、`src/api/result.ts`，通过 `VITE_API_BASE_URL` 与后端交互。
-- 构建与开发指令见 `frontend/package.json`。
+- **技术栈**：Vue 3 + TypeScript + Vite + Element Plus + Tailwind CSS。
+- **入口文件**：`src/main.ts`，路由定义 `src/router/index.ts`。
+- **主要页面**：
+  - `views/HomeView.vue`：项目概览与快速入口。
+  - `views/UploadView.vue`：文件上传、进度跟踪、结果展示。
+  - `views/ResultsView.vue`：分页列表、筛选、详情抽屉，展示统计数据与历史记录。
+  - `views/DetectionsView.vue`：实时检测记录查看。
+- **核心组件**：
+  - `components/UploadPanel.vue`：文件选择、拖拽上传、进度条。
+  - `components/ChatWidget.vue`：AI 聊天浮窗入口。
+  - `components/ChatWindow.vue`：聊天界面主窗口。
+  - `components/ChatBubble.vue`：聊天按钮（最小化状态）。
+  - `components/ChatMessage.vue`：消息渲染（支持 Markdown）。
+- **状态管理**：
+  - `stores/chatStore.ts`：Pinia store，管理聊天会话、消息、UI 状态。
+  - `stores/recordStore.ts`：管理记录列表和过滤状态。
+- **API 封装**：
+  - `src/api/upload.ts`：上传相关 API。
+  - `src/api/result.ts`：结果查询 API。
+  - `src/api/chat.ts`：聊天相关 API（会话、消息）。
+- **构建与开发**指令见 `frontend/package.json`。
 
 ## 4. 数据与存储
 
-### 4.1 PostgreSQL 表结构（`backend/src/db.rs`）
-- `uploads`
+### 4.1 PostgreSQL 表结构（`init-db/00-schema.sql`）
+- **users**（用户表）
   - `id UUID PRIMARY KEY`
+  - `username VARCHAR(50) UNIQUE`
+  - `email VARCHAR(255) UNIQUE`
+  - `password_hash TEXT`
+  - `role VARCHAR(20)` (`admin/user/operator`)
+  - `status VARCHAR(20)` (`active/inactive/suspended`)
+  
+- **uploads**（上传表）
+  - `id UUID PRIMARY KEY`
+  - `user_id UUID` → `users(id)`
   - `filename TEXT`
   - `content_type TEXT`
   - `data BYTEA` —— 直接存储原图二进制
-  - `status TEXT` (`processing/completed/failed`)
-  - `created_at`, `updated_at`（默认 `NOW()`）
-- `results`
-  - `upload_id UUID PRIMARY KEY`（外键关联 `uploads.id`）
+  - `status TEXT` (`pending/processing/completed/failed`)
+  - `created_at`, `updated_at`
+  
+- **results**（检测结果表）
+  - `upload_id UUID PRIMARY KEY` → `uploads(id)`
   - `status TEXT`
-  - `detections JSONB`（缓存检测明细）
+  - `detections JSONB`（检测明细数组）
   - `total_fruits INTEGER`
   - `grade_a/grade_b/grade_c INTEGER`
   - `avg_confidence REAL`
   - `created_at TIMESTAMPTZ`
+  
+- **detections**（实时检测表）
+  - `id UUID PRIMARY KEY`
+  - `user_id UUID` → `users(id)`
+  - `snapshot BYTEA`（快照图像）
+  - `labels TEXT[]`
+  - `confidence_scores REAL[]`
+  - `detected_classes TEXT[]`
+  - `source TEXT` (默认 `live_camera`)
+  - `created_at TIMESTAMPTZ`
+  
+- **chat_sessions**（聊天会话表）
+  - `id UUID PRIMARY KEY`
+  - `user_id UUID` → `users(id)`
+  - `title TEXT`
+  - `status TEXT` (`active/inactive/archived`)
+  - `created_at`, `updated_at`
+  
+- **chat_messages**（聊天消息表）
+  - `id UUID PRIMARY KEY`
+  - `session_id UUID` → `chat_sessions(id)`
+  - `role TEXT` (`user/assistant/system`)
+  - `content TEXT`
+  - `metadata JSONB`（工具调用等元数据）
+  - `created_at TIMESTAMPTZ`
 ### 4.2 Redis 缓存策略
-- 键：`result:<upload_id>`。
-- 值：序列化后的 `UploadResponsePayload`（见 `backend/src/models.rs`）。
-- TTL：默认 900 秒，可通过 `CACHE_TTL_SECONDS` 覆盖。
+- **检测结果缓存**：
+  - 键：`result:<upload_id>`
+  - 值：序列化后的 `UploadResponsePayload`
+  - TTL：默认 900 秒，可通过 `CACHE_TTL_SECONDS` 覆盖
+  
+- **聊天会话缓存**：
+  - 键：`active_session:<user_id>`
+  - 值：当前活跃会话 ID
+  - TTL：1 小时
+  
+- **聊天历史缓存**：
+  - 键：`conversation:<session_id>`
+  - 值：最近 20 条消息的列表
+  - TTL：30 分钟
+  - 操作：追加新消息时自动更新
 
 ## 5. 配置与环境变量
 
 ### 5.1 顶层 `.env`（参考 `.env.example`）
-- `DATABASE_URL` / `POSTGRES_*`：PostgreSQL 连接信息。
-- `REDIS_URL`、`CACHE_TTL_SECONDS`：缓存配置。
-- `BIND_ADDRESS`、`AI_SERVICE_URL`、`RUST_LOG`：后端网络与日志配置。
-- `VITE_API_BASE_URL`、`VITE_APP_NAME` 等：前端构建时读取。
-- `DEV_*` 变量为 `scripts/dev-start.sh` 输出的本地开发建议值。
+- **数据库配置**：
+  - `DATABASE_URL` / `POSTGRES_*`：PostgreSQL 连接信息
+- **缓存配置**：
+  - `REDIS_URL`、`REDIS_PASSWORD`：Redis 连接信息
+  - `CACHE_TTL_SECONDS`：缓存过期时间（默认 900 秒）
+- **后端配置**：
+  - `BIND_ADDRESS`：后端监听地址（默认 `0.0.0.0:8080`）
+  - `AI_SERVICE_URL`：AI 服务地址（默认 `http://ai:8002`）
+  - `RUST_LOG`：日志级别（`debug/info/warn/error`）
+- **LLM 配置**：
+  - `LLM_API_URL`：LLM API 端点（默认 SiliconFlow）
+  - `LLM_API_KEY`：LLM API 密钥（**必需**）
+  - `LLM_MODEL`：使用的模型名称（默认 `Qwen/Qwen3-Coder-30B-A3B-Instruct`）
+  - `LLM_MAX_TOKENS`：最大令牌数（默认 12800）
+- **前端配置**：
+  - `VITE_API_BASE_URL`：API 基础 URL（默认 `/api/v1`）
+  - `VITE_APP_NAME`：应用名称
+- **MCP 配置**（内置，无需独立配置）：
+  - 允许查询的表：`uploads`, `results`, `detections`, `chat_sessions`, `chat_messages`, `users`
+  - 最大行数限制：1000
+  - 查询超时：5 秒
 
 ### 5.2 组件特定配置
-- 后端：
-  - `DATABASE_URL`、`REDIS_URL`、`AI_SERVICE_URL`、`CACHE_TTL_SECONDS`、`BIND_ADDRESS`。
-- AI 服务：
-  - 默认为 CPU 推理，可通过 `CUDA_VISIBLE_DEVICES` 控制 GPU；模型文件位于 `ai/model/`。
-- 前端：
-  - 在 `.env` 或 `.env.local` 中设置 `VITE_API_BASE_URL` 指向后端 API。
+- **后端**：
+  - `DATABASE_URL`、`REDIS_URL`、`AI_SERVICE_URL`
+  - `LLM_API_URL`、`LLM_API_KEY`、`LLM_MODEL`
+  - `CACHE_TTL_SECONDS`、`BIND_ADDRESS`、`RUST_LOG`
+- **AI 服务**：
+  - 默认为 CPU 推理，可通过 `CUDA_VISIBLE_DEVICES` 控制 GPU
+  - 模型文件位于 `ai/model/`
+  - 支持多模型动态加载
+- **前端**：
+  - 在 `.env` 或 `.env.local` 中设置 `VITE_API_BASE_URL` 指向后端 API
+  - 构建时注入环境变量
 
 ## 6. 启动与开发流程
 

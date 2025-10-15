@@ -59,18 +59,23 @@ chmod +x scripts/*.sh
 启动成功后访问：
 - 前端界面: http://localhost:3000
 - 后端 API: http://localhost:8080
-- API 文档: http://localhost:8080/api/docs
 - AI 服务: http://localhost:8002
+- PostgreSQL: localhost:5432 (用户: gyz, 密码: nU1/zzGa)
+- Redis: localhost:6379 (密码: 6RQgSuJH)
 
 ## 组件与资源建议
 
 | 组件 | CPU | 内存 | 磁盘 | 备注 |
 | --- | --- | --- | --- | --- |
-| Rust 后端 | 4 核 | 4 GB | 20 GB | 负责接收上传、调用 AI、写入数据库 |
+| Rust 后端 | 4 核 | 4 GB | 20 GB | 负责接收上传、调用 AI、写入数据库、聊天服务、MCP |
 | AI 推理 (FastAPI + PyTorch) | 8 核 | 16 GB | 50 GB | 可选 GPU；如无 GPU 建议调低并发 |
-| PostgreSQL | 4 核 | 8 GB | 100 GB SSD | 存储上传文件与检测结果 |
-| Redis | 2 核 | 2 GB | 10 GB | 缓存热点数据 |
+| PostgreSQL | 4 核 | 8 GB | 100 GB SSD | 存储上传文件、检测结果、聊天记录 |
+| Redis | 2 核 | 2 GB | 10 GB | 缓存热点数据、会话信息、聊天历史 |
 | 前端 | 1 核 | 1 GB | 5 GB | 可与反向代理共用节点 |
+
+**额外资源需求**（使用聊天功能时）：
+- **LLM API 调用**：需要稳定的互联网连接和有效的 API 密钥
+- **并发聊天**：每个活跃会话约占用 10-20 MB Redis 内存
 
 
 
@@ -85,6 +90,9 @@ cp .env.example .env
 # 根据需要调整数据库、缓存、端口等配置
 # ⚠️ 生产环境务必修改以下配置：
 #   - POSTGRES_PASSWORD: 数据库密码
+#   - REDIS_PASSWORD: Redis 密码
+#   - LLM_API_KEY: LLM API 密钥（必需，用于聊天功能）
+#   - LLM_API_URL: LLM API 地址（可选，默认 SiliconFlow）
 ```
 
 ### 2. 启动服务

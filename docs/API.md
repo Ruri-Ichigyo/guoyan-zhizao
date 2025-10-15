@@ -556,6 +556,194 @@ curl -X POST http://localhost:8002/infer \
 
 ---
 
+## AI 聊天接口
+
+### 1. 会话管理
+
+#### POST /api/v1/chat/sessions
+
+创建新的聊天会话。
+
+**请求体**:
+```json
+{
+  "title": "关于果蔬识别的问题"
+}
+```
+
+**成功响应** (200 OK):
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "title": "关于果蔬识别的问题",
+  "status": "active",
+  "created_at": "2025-10-14T10:00:00Z"
+}
+```
+
+#### GET /api/v1/chat/sessions
+
+获取用户的聊天会话列表。
+
+**查询参数**:
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `status` | string | 否 | 过滤状态：`active`/`inactive`/`archived` |
+| `limit` | number | 否 | 返回数量（默认 20） |
+| `offset` | number | 否 | 偏移量（默认 0） |
+
+**请求示例**:
+```bash
+curl "http://localhost:8080/api/v1/chat/sessions?status=active&limit=10"
+```
+
+**成功响应** (200 OK):
+```json
+{
+  "sessions": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "title": "关于果蔬识别的问题",
+      "status": "active",
+      "created_at": "2025-10-14T10:00:00Z",
+      "updated_at": "2025-10-14T10:15:00Z",
+      "message_count": 5
+    }
+  ],
+  "total": 1
+}
+```
+
+#### DELETE /api/v1/chat/sessions/:id
+
+删除指定的聊天会话（包括所有消息）。
+
+**路径参数**:
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | UUID | 会话 ID |
+
+**请求示例**:
+```bash
+curl -X DELETE http://localhost:8080/api/v1/chat/sessions/550e8400-e29b-41d4-a716-446655440000
+```
+
+**成功响应** (204 No Content):
+- 无响应体
+
+### 2. 消息交互
+
+#### POST /api/v1/chat/message
+
+向 AI 助手发送消息并获取响应。
+
+**请求体**:
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "content": "今天总共上传了多少张图片？"
+}
+```
+
+**成功响应** (200 OK):
+```json
+{
+  "message_id": "660e8400-e29b-41d4-a716-446655440001",
+  "role": "assistant",
+  "content": "根据数据库查询，今天总共上传了 82 张图片。",
+  "tool_calls": [
+    {
+      "tool": "database_query",
+      "input": "SELECT COUNT(*) FROM uploads WHERE DATE(created_at) = CURRENT_DATE",
+      "output": "82"
+    }
+  ],
+  "created_at": "2025-10-14T10:01:00Z"
+}
+```
+
+#### GET /api/v1/chat/history/:session_id
+
+获取指定会话的历史消息。
+
+**路径参数**:
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `session_id` | UUID | 会话 ID |
+
+**查询参数**:
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `limit` | number | 否 | 返回数量（默认 50） |
+| `before` | string | 否 | 获取此时间之前的消息（ISO 8601） |
+
+**请求示例**:
+```bash
+curl "http://localhost:8080/api/v1/chat/history/550e8400-e29b-41d4-a716-446655440000?limit=20"
+```
+
+**成功响应** (200 OK):
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "messages": [
+    {
+      "id": "660e8400-e29b-41d4-a716-446655440001",
+      "role": "user",
+      "content": "今天总共上传了多少张图片？",
+      "created_at": "2025-10-14T10:00:30Z"
+    },
+    {
+      "id": "660e8400-e29b-41d4-a716-446655440002",
+      "role": "assistant",
+      "content": "根据数据库查询，今天总共上传了 82 张图片。",
+      "metadata": {
+        "tool_calls": [
+          {
+            "tool": "database_query",
+            "success": true
+          }
+        ]
+      },
+      "created_at": "2025-10-14T10:01:00Z"
+    }
+  ],
+  "total": 2
+}
+```
+
+#### GET /api/v1/chat/messages/new
+
+轮询获取会话的新消息（长轮询）。
+
+**查询参数**:
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `session_id` | UUID | 是 | 会话 ID |
+| `since` | string | 是 | 获取此时间之后的消息（ISO 8601） |
+
+**请求示例**:
+```bash
+curl "http://localhost:8080/api/v1/chat/messages/new?session_id=550e8400-e29b-41d4-a716-446655440000&since=2025-10-14T10:00:00Z"
+```
+
+**成功响应** (200 OK):
+```json
+{
+  "messages": [
+    {
+      "id": "660e8400-e29b-41d4-a716-446655440003",
+      "role": "assistant",
+      "content": "检测已完成",
+      "created_at": "2025-10-14T10:02:00Z"
+    }
+  ],
+  "has_more": false
+}
+```
+
+---
+
 ## 数据模型定义
 
 ### UnifiedRecord (统一记录)
@@ -653,6 +841,11 @@ curl -X POST http://localhost:8002/infer \
 
 ---
 
-**最后更新**: 2025-10-14
-**API 版本**: v1
-**文档维护**: 果蔬智造团队
+**最后更新**: 2025-10-15  
+**API 版本**: v1.1.0  
+**文档维护**: 果蔬智造团队  
+
+## 版本历史
+
+- **v1.1.0** (2025-10-15): 新增 AI 聊天接口、统一记录 API、实时检测端点
+- **v1.0.0** (2025-10-14): 初始版本，包含上传、结果查询、统计接口
