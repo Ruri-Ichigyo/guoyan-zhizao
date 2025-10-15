@@ -19,17 +19,56 @@
 
 为了更直观地理解系统各组件的交互关系，我们提供了详细的系统架构图。该图展示了从用户请求到数据处理、再到结果返回的完整流程。
 
-![系统架构图](../backend/uml-output/果蔬检测系统-架构图.png)
+#### 完整系统架构（v1.1.0）
 
-**图解:**
-- **用户界面 (Vue 3)**: 作为系统的入口，负责图像上传和结果展示。
-- **后端 (Rust/Axum)**: 核心业务处理层，负责认证、文件存储、与 AI 服务和数据库的交互。
-- **AI 服务 (Python/FastAPI)**: 接收图像并执行分类推理，返回检测结果。
+![系统架构图 v1.1.0](diagrams/output/system-architecture.png)
+
+**主要组件**：
+- **用户界面层**: Web 浏览器（Vue 3）、移动应用、实时摄像头
+- **前端服务**: Nginx 托管、上传组件、结果展示、聊天组件、统计看板
+- **后端 API 服务**: Axum HTTP 服务器、路由层、服务层（AI/LLM/MCP Client）、缓存层
+- **AI 推理服务**: FastAPI 服务器、模型注册表、DenseNet121、质量评估
+- **外部 LLM 服务**: SiliconFlow API、Anthropic Claude API
 - **数据存储**: 
-  - **PostgreSQL**: 持久化存储上传记录和检测结果。
-  - **Redis**: 作为热点数据缓存，加速查询响应。
+  - **PostgreSQL**: 持久化存储上传记录、检测结果、聊天会话和消息
+  - **Redis**: 缓存检测结果、活跃会话、聊天历史
 
-所有架构图（包括序列图、工作流图等）均通过 PlantUML 自动生成，源文件和详细说明请参阅 [backend/UML-DIAGRAMS-README.md](../backend/UML-DIAGRAMS-README.md)。
+#### 核心流程图
+
+**1. 图像上传与识别流程**
+
+![上传流程图](diagrams/output/upload-flow.png)
+
+展示从用户上传图片到 AI 识别完成的完整时序：
+- 图像上传和验证
+- AI 推理处理
+- 结果持久化和缓存
+- 响应返回
+- 后续查询
+
+**2. AI 聊天助手交互流程**
+
+![聊天流程图](diagrams/output/chat-flow.png)
+
+展示聊天功能的完整交互流程：
+- 会话初始化
+- 用户消息发送
+- LLM 处理与工具决策
+- MCP 数据库查询
+- 响应生成和持久化
+- 消息轮询
+
+**3. 系统数据流图**
+
+![数据流图](diagrams/output/data-flow.png)
+
+展示数据在各组件间的流动和转换：
+- 数据源和输入层
+- 数据传输和处理层
+- 数据存储和输出层
+- 数据展示层
+
+**图表源文件**: 所有架构图和流程图均使用 PlantUML 生成，源文件位于 `docs/diagrams/*.puml`。详细说明和生成方法请参阅 [docs/diagrams/README.md](diagrams/README.md)。
 
 ### 2.2 组件角色
 | 模块 | 技术栈 | 关键职责 | 代码位置 |

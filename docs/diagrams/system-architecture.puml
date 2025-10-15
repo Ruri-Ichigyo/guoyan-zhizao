@@ -1,0 +1,173 @@
+@startuml 果蔬智造系统架构图-v1.1.0
+
+!define RECTANGLE class
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+
+title 果蔬智造核心平台 - 系统架构图 v1.0
+
+' 用户界面层
+package "用户界面层" as UI #E3F2FD {
+    rectangle "Web 浏览器\n(Vue 3 + Element Plus)" as WebUI #64B5F6
+    rectangle "移动应用\n(上传接口)" as MobileApp #64B5F6
+    rectangle "实时摄像头\n(检测接口)" as Camera #64B5F6
+}
+
+' 前端服务
+package "前端服务 (Port 3000)" as Frontend #FFF9C4 {
+    rectangle "Nginx\n静态资源托管" as Nginx #FFD54F
+    rectangle "上传组件\nUploadPanel" as UploadComp #FFD54F
+    rectangle "结果展示\nResultsView" as ResultsComp #FFD54F
+    rectangle "聊天组件\nChatWidget" as ChatComp #FFD54F
+    rectangle "统计看板\nStatistics" as StatsComp #FFD54F
+}
+
+' 后端服务层
+package "后端 API 服务 (Port 8080)" as Backend #C8E6C9 {
+    rectangle "Axum HTTP Server" as AxumServer #66BB6A
+    
+    package "路由层" as Routes {
+        rectangle "uploads\n文件上传" as UploadsRoute #81C784
+        rectangle "records\n统一记录" as RecordsRoute #81C784
+        rectangle "detections\n实时检测" as DetectionsRoute #81C784
+        rectangle "statistics\n统计信息" as StatsRoute #81C784
+        rectangle "chat\n聊天接口" as ChatRoute #81C784
+    }
+    
+    package "服务层" as Services {
+        rectangle "AI Client\nHTTP 调用" as AIClient #A5D6A7
+        rectangle "LLM Client\nClaude API" as LLMClient #A5D6A7
+        rectangle "MCP Client\nSQLx Direct" as MCPClient #A5D6A7
+    }
+    
+    package "缓存层" as CacheLayer {
+        rectangle "Redis Client\n结果缓存" as RedisClient #C5E1A5
+        rectangle "会话缓存\nSession Cache" as SessionCache #C5E1A5
+        rectangle "聊天历史\nChat History" as ChatCache #C5E1A5
+    }
+}
+
+' AI 推理服务
+package "AI 推理服务 (Port 8002)" as AIService #FFE0B2 {
+    rectangle "FastAPI Server" as FastAPIServer #FFB74D
+    rectangle "模型注册表\nModel Registry" as ModelRegistry #FFCC80
+    rectangle "DenseNet121\n果蔬分类" as DenseNet #FFCC80
+    rectangle "质量评估\nQuality Grader" as QualityGrader #FFCC80
+    rectangle "图像预处理\nPreprocessor" as Preprocessor #FFCC80
+}
+
+' 外部 LLM 服务
+cloud "外部 LLM 服务" as LLMService #F8BBD0 {
+    rectangle "SiliconFlow API\nQwen/Hunyuan" as SiliconFlow #F06292
+    rectangle "Anthropic API\nClaude" as Claude #F06292
+}
+
+' 数据存储层
+database "PostgreSQL 15\n(Port 5432)" as PostgreSQL #B39DDB {
+    storage "uploads\n上传记录" as UploadsTable
+    storage "results\n检测结果" as ResultsTable
+    storage "detections\n实时检测" as DetectionsTable
+    storage "chat_sessions\n聊天会话" as ChatSessionsTable
+    storage "chat_messages\n聊天消息" as ChatMessagesTable
+    storage "users\n用户信息" as UsersTable
+}
+
+' 缓存存储
+database "Redis 7\n(Port 6379)" as Redis #FFAB91 {
+    storage "result:<id>\n检测结果缓存" as ResultCache
+    storage "active_session:<id>\n活跃会话" as ActiveSession
+    storage "conversation:<id>\n聊天历史" as ConversationCache
+}
+
+' 连接关系 - 用户界面到前端
+WebUI --> Nginx : HTTP/HTTPS
+MobileApp --> AxumServer : REST API
+Camera --> AxumServer : REST API
+
+' 前端组件到后端
+Nginx --> UploadComp
+Nginx --> ResultsComp
+Nginx --> ChatComp
+Nginx --> StatsComp
+
+UploadComp --> AxumServer : POST /api/v1/uploads
+ResultsComp --> AxumServer : GET /api/v1/records
+ChatComp --> AxumServer : WebSocket/REST
+StatsComp --> AxumServer : GET /api/v1/statistics
+
+' 后端路由层
+AxumServer --> Routes
+Routes --> UploadsRoute
+Routes --> RecordsRoute
+Routes --> DetectionsRoute
+Routes --> StatsRoute
+Routes --> ChatRoute
+
+' 路由到服务层
+UploadsRoute --> AIClient : 调用推理
+RecordsRoute --> RedisClient : 查询缓存
+DetectionsRoute --> RedisClient : 缓存快照
+ChatRoute --> LLMClient : 调用 LLM
+ChatRoute --> MCPClient : 数据库查询
+
+' 服务层连接
+AIClient --> FastAPIServer : HTTP POST /infer
+LLMClient --> LLMService : HTTP API
+MCPClient --> PostgreSQL : SQLx 查询
+
+RedisClient --> Redis : TCP 6379
+SessionCache --> Redis
+ChatCache --> Redis
+
+' AI 服务内部
+FastAPIServer --> ModelRegistry
+ModelRegistry --> DenseNet
+FastAPIServer --> Preprocessor
+FastAPIServer --> QualityGrader
+
+' 数据持久化
+UploadsRoute --> PostgreSQL : 写入 uploads
+AIClient --> PostgreSQL : 写入 results
+DetectionsRoute --> PostgreSQL : 写入 detections
+ChatRoute --> PostgreSQL : 写入 chat_*
+
+' LLM 服务
+LLMService --> SiliconFlow
+LLMService --> Claude
+
+' 数据表关系
+PostgreSQL --> UploadsTable
+PostgreSQL --> ResultsTable
+PostgreSQL --> DetectionsTable
+PostgreSQL --> ChatSessionsTable
+PostgreSQL --> ChatMessagesTable
+PostgreSQL --> UsersTable
+
+' 缓存项
+Redis --> ResultCache
+Redis --> ActiveSession
+Redis --> ConversationCache
+
+' 图例
+legend right
+  |= 颜色 |= 说明 |
+  | <#E3F2FD> | 用户界面层 |
+  | <#FFF9C4> | 前端服务 (Vue 3) |
+  | <#C8E6C9> | 后端服务 (Rust) |
+  | <#FFE0B2> | AI 服务 (Python) |
+  | <#F8BBD0> | 外部 LLM 服务 |
+  | <#B39DDB> | PostgreSQL 数据库 |
+  | <#FFAB91> | Redis 缓存 |
+  
+  **核心特性 v1.1.0**
+  • AI 聊天助手集成
+  • MCP 协议（内置实现）
+  • 统一记录 API
+  • 实时检测支持
+  • 多模型管理
+  
+  **生成时间**: 2025-10-15
+endlegend
+
+@enduml

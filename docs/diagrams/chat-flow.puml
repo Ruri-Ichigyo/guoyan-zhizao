@@ -1,0 +1,180 @@
+@startuml ChatFlow
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+
+title
+    AI 聊天助手交互流程
+    果蔬智造核心平台 v1.0 
+end title
+
+actor "用户" as User
+participant "前端\nChatWidget" as Frontend
+participant "后端\nChat Routes" as Backend
+participant "LLM Client" as LLM
+participant "MCP Client\n(SQLx Direct)" as MCP
+database "PostgreSQL" as DB
+database "Redis\n会话缓存" as Cache
+boundary "LLM API\n(SiliconFlow)" as LLMService
+
+== 1. 会话初始化 ==
+
+User -> Frontend: 点击聊天按钮
+activate Frontend
+
+Frontend -> Backend: POST /api/v1/chat/sessions\n{title: "新对话"}
+activate Backend
+
+Backend -> DB: INSERT INTO chat_sessions\n(user_id, title, status='active')
+activate DB
+DB --> Backend: 返回 session_id
+deactivate DB
+
+Backend -> Cache: SET active_session:{user_id}\n(session_id, TTL=1h)
+activate Cache
+Cache --> Backend: OK
+deactivate Cache
+
+Backend --> Frontend: 200 OK\n{session_id, created_at}
+deactivate Backend
+
+Frontend -> Frontend: 初始化聊天界面\n创建 Pinia store
+Frontend --> User: 显示聊天窗口
+deactivate Frontend
+
+== 2. 用户发送消息 ==
+
+User -> Frontend: 输入问题:\n"今天上传了多少张图片?"
+activate Frontend
+
+Frontend -> Backend: POST /api/v1/chat/message\n{session_id, content}
+activate Backend
+
+Backend -> DB: INSERT INTO chat_messages\n(session_id, role='user', content)
+activate DB
+DB --> Backend: 确认写入
+deactivate DB
+
+Backend -> Cache: RPUSH conversation:{session_id}\n追加用户消息
+activate Cache
+Cache --> Backend: OK
+deactivate Cache
+
+== 3. LLM 处理与工具决策 ==
+
+Backend -> Cache: LRANGE conversation:{session_id} -20 -1\n获取最近20条历史
+activate Cache
+Cache --> Backend: 返回聊天历史
+deactivate Cache
+
+Backend -> LLM: 构建请求\nsystem_prompt + history + tools
+activate LLM
+
+LLM -> LLMService: POST /v1/messages\n{model, messages, tools}
+activate LLMService
+
+LLMService -> LLMService: 分析用户意图\n识别需要查询数据库
+LLMService --> LLM: 返回工具调用\ntool_use: database_query
+deactivate LLMService
+
+LLM --> Backend: tool_calls: [database_query]
+deactivate LLM
+
+== 4. MCP 执行数据库查询 ==
+
+Backend -> MCP: execute_tool(database_query)
+activate MCP
+
+MCP -> MCP: 安全检查\n表白名单验证、SQL注入检测、关键字过滤
+
+MCP -> DB: SQLx 执行查询\n预编译语句
+activate DB
+DB --> MCP: 返回结果\n[{count: 15}]
+deactivate DB
+
+MCP -> MCP: 格式化结果\n限制行数 (max: 1000)
+MCP --> Backend: tool_result: {success: true, rows: [{count: 15}], row_count: 1}
+deactivate MCP
+
+== 5. LLM 生成最终回复 ==
+
+Backend -> LLM: 发送工具结果
+activate LLM
+
+LLM -> LLMService: POST /v1/messages\n{..., tool_results}
+activate LLMService
+
+LLMService -> LLMService: 基于查询结果\n生成自然语言回复
+LLMService --> LLM: 返回文本响应
+deactivate LLMService
+
+LLM --> Backend: content: "根据数据库查询，今天总共上传了 15 张图片。"
+deactivate LLM
+
+== 6. 响应持久化与返回 ==
+
+Backend -> DB: INSERT INTO chat_messages\n(role='assistant', content, metadata)
+activate DB
+note right
+    metadata 包含：
+    • tool_calls 详情
+    • 查询耗时
+    • 模型信息
+end note
+DB --> Backend: 确认写入
+deactivate DB
+
+Backend -> Cache: RPUSH conversation:{session_id}\n追加助手消息
+Backend -> Cache: LTRIM -20 (保持最近20条)
+activate Cache
+Cache --> Backend: OK
+deactivate Cache
+
+Backend --> Frontend: 200 OK\n{message_id, role: 'assistant', content, tool_calls, created_at}
+deactivate Backend
+
+Frontend -> Frontend: 渲染 Markdown 消息\n显示工具调用信息
+Frontend --> User: 显示 AI 回复
+deactivate Frontend
+
+== 7. 轮询获取新消息（可选）==
+
+loop 每 5 秒
+    Frontend -> Backend: GET /api/v1/chat/messages/new
+    activate Backend
+    Backend -> Cache: LRANGE conversation:{session_id}
+    activate Cache
+    alt 有新消息
+        Cache --> Backend: 返回新消息
+        deactivate Cache
+        Backend --> Frontend: 200 OK {messages: [...]} 
+        Frontend -> Frontend: 更新界面
+    else 无新消息
+        Cache --> Backend: 空列表
+        deactivate Cache
+        Backend --> Frontend: 200 OK {messages: []}
+    end
+    deactivate Backend
+end
+
+note over User, LLMService
+MCP 安全限制：
+• 仅允许 SELECT 查询
+• 表白名单: uploads, results, detections, chat_*
+• 最大返回: 1000 行
+• 查询超时: 5 秒
+• SQL 注入防护
+
+缓存策略：
+• 活跃会话: TTL 1 小时
+• 聊天历史: TTL 30 分钟
+• 最多缓存: 20 条消息
+
+性能指标：
+• LLM 响应: 1-3 秒
+• 数据库查询: < 100ms
+• 总响应时间: < 5 秒
+end note
+
+@enduml
