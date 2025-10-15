@@ -1,0 +1,117 @@
+@startuml 图像上传与识别流程
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+
+title 图像上传与识别完整流程\n果蔬智造核心平台 v1.0
+
+actor "用户" as User
+participant "前端\n(Vue 3)" as Frontend
+participant "后端\n(Rust/Axum)" as Backend
+participant "AI 服务\n(FastAPI)" as AI
+database "PostgreSQL" as DB
+database "Redis" as Cache
+
+== 1. 图像上传阶段 ==
+
+User -> Frontend: 选择图片文件
+activate Frontend
+
+Frontend -> Frontend: 客户端验证\n(格式/大小)
+Frontend -> Backend: POST /api/v1/uploads\n(multipart/form-data)
+activate Backend
+
+Backend -> Backend: 解析文件\n生成 upload_id
+Backend -> DB: INSERT INTO uploads\n(data: BYTEA)
+activate DB
+DB --> Backend: 返回 upload_id
+deactivate DB
+
+Backend -> Backend: 更新状态为\n'processing'
+
+== 2. AI 推理阶段 ==
+
+Backend -> AI: POST /infer\n(upload_id + file bytes)
+activate AI
+
+AI -> AI: 图像预处理\n(Resize 224x224)
+AI -> AI: DenseNet121 推理\n获取 Top-K 结果
+AI -> AI: 质量评估\n(颜色/纹理/新鲜度)
+AI -> AI: 生成分级\n(A/B/C)
+
+AI --> Backend: 返回推理结果\n(JSON)
+deactivate AI
+
+== 3. 结果持久化阶段 ==
+
+Backend -> Backend: 计算统计数据\n(total/grade_a/b/c)
+Backend -> DB: INSERT INTO results\n(detections: JSONB)
+activate DB
+DB --> Backend: 确认写入
+deactivate DB
+
+Backend -> DB: UPDATE uploads\nSET status='completed'
+activate DB
+DB --> Backend: 确认更新
+deactivate DB
+
+== 4. 缓存阶段 ==
+
+Backend -> Cache: SET result:<upload_id>\n(JSON, TTL=900s)
+activate Cache
+Cache --> Backend: OK
+deactivate Cache
+
+== 5. 返回响应 ==
+
+Backend --> Frontend: 200 OK\n完整检测结果
+deactivate Backend
+
+Frontend -> Frontend: 解析结果\n渲染界面
+Frontend --> User: 显示检测结果\n(类别/质量/统计)
+deactivate Frontend
+
+== 6. 后续查询（可选）==
+
+User -> Frontend: 查看历史记录
+activate Frontend
+Frontend -> Backend: GET /api/v1/records/:id
+activate Backend
+
+Backend -> Cache: GET result:<upload_id>
+activate Cache
+
+alt 缓存命中
+    Cache --> Backend: 返回缓存数据
+    Backend --> Frontend: 200 OK (from cache)
+else 缓存未命中
+    Cache --> Backend: nil
+    deactivate Cache
+    Backend -> DB: SELECT * FROM results\nWHERE upload_id = ?
+    activate DB
+    DB --> Backend: 返回数据库记录
+    deactivate DB
+    Backend -> Cache: 更新缓存
+    Backend --> Frontend: 200 OK (from DB)
+end
+
+deactivate Backend
+Frontend --> User: 显示详细结果
+deactivate Frontend
+
+note over User, Cache
+  **关键性能指标**
+  • 上传处理: < 100ms
+  • AI 推理: 200-500ms
+  • 数据库写入: < 50ms
+  • 缓存写入: < 10ms
+  • 总耗时: < 1s
+  
+  **并发能力**
+  • 最大并发上传: 50+
+  • AI 服务 QPS: 10-20
+  • 数据库连接池: 20
+end note
+
+@enduml

@@ -1,0 +1,64 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Documentation
+*.md
+docs/
+README*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Rust
+target/
+Cargo.lock
+
+# Node.js / Vue
+node_modules/
+npm-debug.log*
+dist/
+.vite/
+
+# Environment
+.env
+.env.local
+.envrc
+
+# Uploads (runtime generated)
+uploads/
+
+# Specification workflow
+.specify/
+.claude/
+
+# Tests
+tests/
+cypress/
+*.test.ts
+*.spec.ts
+*.test.js
+*.spec.js
+
+# Logs
+*.log
+logs/

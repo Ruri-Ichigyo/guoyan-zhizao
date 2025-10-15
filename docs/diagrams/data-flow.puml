@@ -1,0 +1,161 @@
+@startuml 系统数据流图
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+
+title 果蔬智造核心平台 - 数据流图 v1.0\n展示数据在各组件间的流动和转换
+
+' 数据源
+rectangle "数据源" as DataSource #E3F2FD {
+    (用户上传图片) as UploadImage
+    (摄像头快照) as CameraSnapshot
+    (用户聊天消息) as ChatMessage
+}
+
+' 数据输入层
+rectangle "数据输入层" as InputLayer #FFF9C4 {
+    [图片文件\nJPG/PNG] as ImageFile
+    [快照数据\nBytea] as SnapshotData
+    [文本消息\nUTF-8] as TextData
+}
+
+' 数据传输层
+rectangle "数据传输层" as TransportLayer #C8E6C9 {
+    [HTTP Multipart\nForm Data] as Multipart
+    [JSON Payload\nREST API] as JsonPayload
+    [WebSocket\nFrame] as WebSocketFrame
+}
+
+' 数据处理层
+rectangle "数据处理层" as ProcessLayer #FFE0B2 {
+    package "图像处理" {
+        [预处理\nResize/Normalize] as Preprocess
+        [DenseNet121\n特征提取] as FeatureExtract
+        [质量评估\nA/B/C 分级] as QualityGrade
+    }
+    
+    package "文本处理" {
+        [消息解析\nJSON Parser] as MessageParser
+        [LLM 推理\nClaude API] as LLMInference
+        [MCP 查询\nSQL 执行] as MCPQuery
+    }
+}
+
+' 数据存储层
+database "数据存储层" as StorageLayer #B39DDB {
+    frame "PostgreSQL" {
+        [uploads 表\n原图 BYTEA] as UploadsTable
+        [results 表\nJSONB 结果] as ResultsTable
+        [detections 表\n快照数组] as DetectionsTable
+        [chat_sessions 表\n会话信息] as SessionsTable
+        [chat_messages 表\n消息内容+元数据] as MessagesTable
+    }
+    
+    frame "Redis" {
+        [result:<id>\nJSON String] as ResultCache
+        [active_session:<id>\nUUID] as SessionCache
+        [conversation:<id>\nList<Message>] as ConversationCache
+    }
+}
+
+' 数据输出层
+rectangle "数据输出层" as OutputLayer #C5E1A5 {
+    [检测结果 JSON\n{class, confidence, grade}] as DetectionResult
+    [统计数据 JSON\n{total, grade_a/b/c}] as Statistics
+    [聊天响应 JSON\n{content, tool_calls}] as ChatResponse
+}
+
+' 数据展示层
+rectangle "数据展示层" as PresentationLayer #90CAF9 {
+    (前端 UI\nVue 组件) as FrontendUI
+    (可视化图表\nECharts) as Charts
+    (聊天界面\nMarkdown) as ChatUI
+}
+
+' 数据流连接 - 上传流程
+UploadImage --> ImageFile
+ImageFile --> Multipart
+Multipart --> UploadsTable : "存储原图"
+Multipart --> Preprocess : "发送字节流"
+Preprocess --> FeatureExtract : "224x224 Tensor"
+FeatureExtract --> QualityGrade : "Top-K 预测"
+QualityGrade --> ResultsTable : "JSONB 写入"
+ResultsTable --> ResultCache : "缓存 900s"
+ResultCache --> DetectionResult : "序列化 JSON"
+DetectionResult --> FrontendUI : "HTTP 响应"
+
+' 数据流连接 - 检测流程
+CameraSnapshot --> SnapshotData
+SnapshotData --> DetectionsTable : "直接存储"
+DetectionsTable --> Statistics : "聚合查询"
+Statistics --> Charts : "可视化展示"
+
+' 数据流连接 - 聊天流程
+ChatMessage --> TextData
+TextData --> JsonPayload
+JsonPayload --> MessageParser
+MessageParser --> MessagesTable : "用户消息"
+MessageParser --> LLMInference : "构建 Prompt"
+LLMInference --> MCPQuery : "工具调用"
+MCPQuery --> UploadsTable : "查询数据"
+MCPQuery --> ResultsTable : "查询数据"
+UploadsTable --> MCPQuery : "返回结果"
+ResultsTable --> MCPQuery : "返回结果"
+MCPQuery --> LLMInference : "工具输出"
+LLMInference --> MessagesTable : "助手响应"
+MessagesTable --> ConversationCache : "缓存历史"
+ConversationCache --> ChatResponse : "序列化"
+ChatResponse --> ChatUI : "Markdown 渲染"
+
+' 数据流连接 - 缓存更新
+SessionsTable --> SessionCache : "活跃会话"
+MessagesTable --> ConversationCache : "最近 20 条"
+
+note right of StorageLayer
+  **数据持久化策略**
+  • 原图: PostgreSQL BYTEA (直接存储)
+  • 结果: PostgreSQL JSONB + Redis 缓存
+  • 快照: PostgreSQL BYTEA 数组
+  • 聊天: PostgreSQL TEXT + Redis List
+  
+  **缓存 TTL**
+  • 检测结果: 900 秒
+  • 活跃会话: 3600 秒
+  • 聊天历史: 1800 秒
+end note
+
+note left of ProcessLayer
+  **数据转换**
+  • 图像: Binary → Tensor → Logits → JSON
+  • 文本: String → JSON → SQL → String
+  
+  **数据格式**
+  • 上传: multipart/form-data
+  • API: application/json
+  • WebSocket: text/json frames
+  
+  **数据验证**
+  • 图片: 格式/大小检查
+  • SQL: 注入防护/白名单
+  • JSON: Schema 验证
+end note
+
+legend right
+  |= 颜色 |= 说明 |
+  | <#E3F2FD> | 数据源 |
+  | <#FFF9C4> | 输入层 |
+  | <#C8E6C9> | 传输层 |
+  | <#FFE0B2> | 处理层 |
+  | <#B39DDB> | 存储层 |
+  | <#C5E1A5> | 输出层 |
+  | <#90CAF9> | 展示层 |
+  
+  **数据流类型**
+  • 实线箭头: 同步数据流
+  • 虚线箭头: 异步数据流
+  
+  **生成时间**: 2025-10-15
+endlegend
+
+@enduml

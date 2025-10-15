@@ -1,0 +1,12 @@
+{
+  "totals": {
+    "total": 2,
+    "completed": 2,
+    "processing": 0,
+    "failed": 0,
+    "total_fruits": 27
+  },
+  "averages": {
+    "avg_confidence": 0.93
+  }
+}

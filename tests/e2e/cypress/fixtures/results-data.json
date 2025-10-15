@@ -1,0 +1,32 @@
+{
+  "data": [
+    {
+      "upload_id": "upload_20231201_001",
+      "filename": "apple_batch_001.jpg",
+      "status": "completed",
+      "created_at": "2023-12-01T10:30:00Z",
+      "total_fruits": 15,
+      "grade_a": 8,
+      "grade_b": 5,
+      "grade_c": 2,
+      "avg_confidence": 0.95
+    },
+    {
+      "upload_id": "upload_20231201_002",
+      "filename": "orange_batch_002.jpg",
+      "status": "completed",
+      "created_at": "2023-12-01T10:25:00Z",
+      "total_fruits": 12,
+      "grade_a": 6,
+      "grade_b": 4,
+      "grade_c": 2,
+      "avg_confidence": 0.92
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 2,
+    "pages": 1
+  }
+}
